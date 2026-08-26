@@ -1,10 +1,10 @@
 package com.recruitr.enrollment.controller;
 
 import com.recruitr.enrollment.dto.*;
-import com.recruitr.enrollment.model.DriveCollege;
-import com.recruitr.enrollment.model.StudentEnrollment;
 import com.recruitr.enrollment.service.EnrollmentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,57 +18,83 @@ public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
 
+    // Assign college to drive (COMPANY_ADMIN)
     @PostMapping("/enrollment/drive/{driveId}/college/{collegeId}")
-    public ResponseEntity<DriveCollege> assignCollege(
+    public ResponseEntity<Void> assignCollege(
             @PathVariable Long driveId,
             @PathVariable Long collegeId,
             @RequestHeader("X-User-Role") String role) {
-        if (!"COMPANY_ADMIN".equals(role)) {
-            return ResponseEntity.status(403).build();
-        }
-        return ResponseEntity.status(201).body(enrollmentService.assignCollegeToDrive(driveId, collegeId));
+        enrollmentService.assignCollegeToDrive(
+                driveId, collegeId, role);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    // Enroll single student (COLLEGE_ADMIN)
     @PostMapping("/enrollment/drive/{driveId}/students")
-    public ResponseEntity<StudentEnrollment> enrollStudent(
+    public ResponseEntity<EnrollmentResponse> enrollStudent(
             @PathVariable Long driveId,
-            @RequestBody EnrollStudentRequest request,
+            @Valid @RequestBody EnrollStudentRequest request,
             @RequestHeader("X-User-Role") String role) {
-        if (!"COLLEGE_ADMIN".equals(role)) {
-            return ResponseEntity.status(403).build();
-        }
         request.setDriveId(driveId);
-        return ResponseEntity.status(201).body(enrollmentService.enrollStudent(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(enrollmentService.enrollStudent(
+                    request, role));
     }
 
-    @PostMapping("/enrollment/drive/{driveId}/students/bulk")
-    public ResponseEntity<BulkUploadResponse> bulkEnroll(
+    // CSV bulk upload (COLLEGE_ADMIN)
+    @PostMapping(
+        value = "/enrollment/drive/{driveId}/students/bulk",
+        consumes = "multipart/form-data")
+    public ResponseEntity<BulkEnrollmentResponse> bulkEnroll(
             @PathVariable Long driveId,
+            @RequestParam("roundId") Long roundId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "roundId") Long roundId,
-            @RequestHeader("X-User-Id") Long userId) {
-        BulkUploadResponse response = enrollmentService.bulkEnroll(driveId, roundId, file, userId);
-        return ResponseEntity.ok(response);
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String role) {
+        return ResponseEntity.ok(
+                enrollmentService.bulkEnrollFromCsv(
+                    driveId, roundId,
+                    Long.parseLong(userId), file, role));
     }
 
+    // Check eligibility (internal — called by Exam Service)
     @GetMapping("/eligibility/check")
     public ResponseEntity<EligibilityResponse> checkEligibility(
             @RequestParam Long studentId,
             @RequestParam Long roundId) {
-        boolean eligible = enrollmentService.checkEligibility(studentId, roundId);
-        return ResponseEntity.ok(EligibilityResponse.builder().eligible(eligible).build());
+        return ResponseEntity.ok(
+                enrollmentService.checkEligibility(
+                    studentId, roundId));
     }
 
+    // Get all enrolled students for a drive
     @GetMapping("/enrollment/drive/{driveId}/students")
-    public ResponseEntity<List<StudentEnrollment>> getEnrolledStudents(
-            @PathVariable Long driveId) {
-        return ResponseEntity.ok(enrollmentService.getEnrolledStudents(driveId));
+    public ResponseEntity<List<EnrollmentResponse>>
+            getEnrolledStudents(
+            @PathVariable Long driveId,
+            @RequestHeader("X-User-Role") String role) {
+        return ResponseEntity.ok(
+                enrollmentService.getEnrolledStudents(
+                    driveId, role));
     }
 
+    // Update enrollment status (called by Results Service)
     @PatchMapping("/enrollment/{enrollmentId}/status")
-    public ResponseEntity<StudentEnrollment> updateStatus(
+    public ResponseEntity<EnrollmentResponse> updateStatus(
             @PathVariable Long enrollmentId,
-            @RequestBody UpdateStatusRequest request) {
-        return ResponseEntity.ok(enrollmentService.updateStatus(enrollmentId, request.getStatus()));
+            @Valid @RequestBody UpdateStatusRequest request) {
+        return ResponseEntity.ok(
+                enrollmentService.updateEnrollmentStatus(
+                    enrollmentId, request));
+    }
+
+    // Get all enrollments for a student
+    @GetMapping("/enrollment/student/{studentId}")
+    public ResponseEntity<List<EnrollmentResponse>>
+            getStudentEnrollments(
+            @PathVariable Long studentId) {
+        return ResponseEntity.ok(
+                enrollmentService.getEnrollmentsForStudent(
+                    studentId));
     }
 }
