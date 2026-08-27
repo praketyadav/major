@@ -1,15 +1,10 @@
 package com.recruitr.results.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class ScoreResponse {
     private Long resultId;
     private Double mcqScore;
+    private String message;
 }

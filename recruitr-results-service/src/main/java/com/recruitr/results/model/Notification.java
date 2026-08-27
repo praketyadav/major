@@ -1,22 +1,21 @@
 package com.recruitr.results.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "notifications")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Column(nullable = false)
@@ -26,9 +25,9 @@ public class Notification {
     private String message;
 
     @Column(nullable = false)
-    private boolean isRead = false;
+    private boolean read = false;
 
-    @Column
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

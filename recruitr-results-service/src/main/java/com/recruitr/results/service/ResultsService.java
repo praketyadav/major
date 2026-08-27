@@ -1,226 +1,447 @@
 package com.recruitr.results.service;
 
 import com.recruitr.results.dto.*;
-import com.recruitr.results.exception.ResourceNotFoundException;
+import com.recruitr.results.exception.*;
 import com.recruitr.results.model.*;
 import com.recruitr.results.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ResultsService {
 
     private final ResultRepository resultRepository;
-    private final SubjectiveReviewRepository subjectiveReviewRepository;
+    private final SubjectiveReviewRepository
+            subjectiveReviewRepository;
     private final NotificationRepository notificationRepository;
     private final RestTemplate restTemplate;
 
-    public ScoreResponse calculateScore(ScoreRequest request) {
-        Long sessionId = request.getSessionId();
-        Long studentId = request.getStudentId();
-        Long roundId = request.getRoundId();
+    @Value("${services.exam-url}")
+    private String examUrl;
+
+    @Value("${services.drive-url}")
+    private String driveUrl;
+
+    @Value("${services.enrollment-url}")
+    private String enrollmentUrl;
+
+    // ── Score MCQ on Submission ──────────────────────────
+
+    @Transactional
+    public ScoreResponse scoreMcq(ScoreRequest request) {
+
+        // Skip if result already exists (idempotent)
+        if (resultRepository.existsByStudentIdAndRoundId(
+                request.getStudentId(), request.getRoundId())) {
+            Result existing = resultRepository
+                .findByStudentIdAndRoundId(
+                    request.getStudentId(),
+                    request.getRoundId()).get();
+            ScoreResponse r = new ScoreResponse();
+            r.setResultId(existing.getId());
+            r.setMcqScore(existing.getMcqScore());
+            r.setMessage("Result already computed.");
+            return r;
+        }
 
         // 1. Fetch student responses from Exam Service
-        String responsesUrl = "http://localhost:8084/api/v1/session/" + sessionId + "/responses";
-        List<Map<String, Object>> responses = new ArrayList<>();
+        List<?> rawResponses = restTemplate.getForObject(
+            examUrl + "/api/v1/session/"
+                + request.getSessionId() + "/responses",
+            List.class);
+
+        List<Map<?, ?>> responses = rawResponses != null
+            ? rawResponses.stream()
+                .map(r -> (Map<?, ?>) r)
+                .collect(Collectors.toList())
+            : new ArrayList<>();
+
+        // 2. Fetch round data from Drive Service
+        Map<?, ?> roundData = null;
         try {
-            ResponseEntity<List> resp = restTemplate.getForEntity(responsesUrl, List.class);
-            if (resp.getBody() != null) {
-                responses = resp.getBody();
+            roundData = restTemplate.getForObject(
+                driveUrl + "/api/v1/drives/0/rounds/"
+                    + request.getRoundId(),
+                Map.class);
+        } catch (Exception ignored) {}
+
+        Long driveId = roundData != null
+                && roundData.get("driveId") != null
+            ? ((Number) roundData.get("driveId")).longValue()
+            : 0L;
+
+        // 3. Fetch questions with correct answers
+        List<?> rawQuestions = null;
+        try {
+            rawQuestions = restTemplate.getForObject(
+                driveUrl + "/api/v1/drives/" + driveId
+                    + "/rounds/" + request.getRoundId()
+                    + "/questions",
+                List.class);
+        } catch (Exception ignored) {}
+
+        List<Map<?, ?>> questions = rawQuestions != null
+            ? rawQuestions.stream()
+                .map(q -> (Map<?, ?>) q)
+                .collect(Collectors.toList())
+            : new ArrayList<>();
+
+        // 4. Build answer key map: questionId → correctOption
+        Map<Long, String> answerKey = new HashMap<>();
+        Map<Long, Double> marksMap = new HashMap<>();
+        for (Map<?, ?> q : questions) {
+            if (q.get("id") != null) {
+                Long qId = ((Number) q.get("id")).longValue();
+                String correct = q.get("correctOption") != null
+                    ? q.get("correctOption").toString() : null;
+                Double marks = q.get("marks") != null
+                    ? ((Number) q.get("marks")).doubleValue()
+                    : 0.0;
+                answerKey.put(qId, correct);
+                marksMap.put(qId, marks);
             }
-        } catch (Exception e) {
-            // fallback
         }
 
-        // 2. Fetch questions from Drive Service (we need driveId, but can query questions for round)
-        // We'll search across drives or use round questions endpoint
-        // Let's assume we can fetch questions via Drive Service endpoint
-        // To get questions with correctOption, drive service provides questions endpoint
-        Map<Long, Map<String, Object>> questionMap = new HashMap<>();
-        try {
-            // Fetch driveId by inspecting round or passing driveId, or querying drive service
-            // Here we call questions endpoint
-            String qUrl = "http://localhost:8082/api/v1/questions";
-            ResponseEntity<List> qResp = restTemplate.getForEntity(qUrl, List.class);
-            if (qResp.getBody() != null) {
-                for (Object item : qResp.getBody()) {
-                    if (item instanceof Map) {
-                        Map<String, Object> q = (Map<String, Object>) item;
-                        Long qId = Long.valueOf(q.get("id").toString());
-                        questionMap.put(qId, q);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // fallback
-        }
-
+        // 5. Compute MCQ score
         double mcqScore = 0.0;
-        for (Map<String, Object> respMap : responses) {
-            Long qId = Long.valueOf(respMap.get("questionId").toString());
-            String selectedOption = (String) respMap.get("selectedOption");
+        for (Map<?, ?> response : responses) {
+            if (response.get("questionId") == null) continue;
+            Long qId = ((Number) response.get("questionId"))
+                    .longValue();
+            String selected =
+                response.get("selectedOption") != null
+                    ? response.get("selectedOption").toString()
+                    : null;
+            String correct = answerKey.get(qId);
 
-            if (selectedOption != null && questionMap.containsKey(qId)) {
-                Map<String, Object> question = questionMap.get(qId);
-                String correctOption = (String) question.get("correctOption");
-                Double marks = Double.valueOf(question.get("marks").toString());
-
-                if (selectedOption.equalsIgnoreCase(correctOption)) {
-                    mcqScore += marks;
-                }
+            if (selected != null && selected.equals(correct)) {
+                mcqScore += marksMap.getOrDefault(qId, 0.0);
             }
         }
 
-        Result result = Result.builder()
-                .studentId(studentId)
-                .roundId(roundId)
-                .sessionId(sessionId)
-                .mcqScore(mcqScore)
-                .subjectiveScore(0.0)
-                .totalScore(mcqScore)
-                .subjectiveReviewed(false)
-                .resultKeyReleased(false)
-                .build();
+        // 6. Save Result
+        Result result = new Result();
+        result.setStudentId(request.getStudentId());
+        result.setRoundId(request.getRoundId());
+        result.setSessionId(request.getSessionId());
+        result.setMcqScore(mcqScore);
+        result.setSubjectiveScore(0.0);
+        result.setTotalScore(mcqScore);
+        Result saved = resultRepository.save(result);
 
-        Result savedResult = resultRepository.save(result);
+        // 7. Create notification for student
+        createNotification(
+            request.getStudentId(),
+            "Exam Submitted",
+            "Your exam submission has been received. "
+                + "MCQ Score: " + mcqScore);
 
-        // Create Notification for student
-        notificationRepository.save(Notification.builder()
-                .userId(studentId)
-                .title("Submission Received")
-                .message("Your Round " + roundId + " submission has been received. MCQ score: " + mcqScore)
-                .isRead(false)
-                .build());
-
-        return ScoreResponse.builder()
-                .resultId(savedResult.getId())
-                .mcqScore(mcqScore)
-                .build();
+        ScoreResponse scoreResp = new ScoreResponse();
+        scoreResp.setResultId(saved.getId());
+        scoreResp.setMcqScore(mcqScore);
+        scoreResp.setMessage(
+            "MCQ scoring complete. Subjective pending review.");
+        return scoreResp;
     }
 
-    public Result getStudentResult(Long studentId, Long roundId) {
-        Result result = resultRepository.findByStudentIdAndRoundId(studentId, roundId)
-                .orElseThrow(() -> new ResourceNotFoundException("Result not found for student " + studentId + " in round " + roundId));
+    // ── Get Result for Student ───────────────────────────
 
-        if (!result.isResultKeyReleased()) {
-            // Return result with masked/hidden full scorecard details if key not released
-            // We set subjective review flag info or return copy
-            Result sanitized = new Result();
-            sanitized.setId(result.getId());
-            sanitized.setStudentId(result.getStudentId());
-            sanitized.setRoundId(result.getRoundId());
-            sanitized.setSessionId(result.getSessionId());
-            sanitized.setMcqScore(result.getMcqScore());
-            sanitized.setSubjectiveScore(result.getSubjectiveScore());
-            sanitized.setTotalScore(result.getTotalScore());
-            sanitized.setPercentile(result.getPercentile());
-            sanitized.setSubjectiveReviewed(result.isSubjectiveReviewed());
-            sanitized.setResultKeyReleased(false);
-            sanitized.setCreatedAt(result.getCreatedAt());
-            return sanitized;
+    public ResultResponse getResultForStudent(
+            Long studentId, Long roundId) {
+        Result result = resultRepository
+            .findByStudentIdAndRoundId(studentId, roundId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Result not found for student "
+                    + studentId + " round " + roundId));
+        return mapToResponse(result);
+    }
+
+    // ── Get All Results for Round ────────────────────────
+
+    public RoundResultSummary getResultsForRound(
+            Long roundId, String callerRole) {
+        if (!"COMPANY_ADMIN".equals(callerRole)
+                && !"SUPER_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Company Admin can view round results");
+        }
+        List<Result> results =
+            resultRepository.findByRoundId(roundId);
+
+        double avg = results.stream()
+            .mapToDouble(Result::getTotalScore)
+            .average().orElse(0.0);
+
+        RoundResultSummary summary = new RoundResultSummary();
+        summary.setRoundId(roundId);
+        summary.setTotalAttempted(results.size());
+        summary.setAverageScore(avg);
+        summary.setResults(results.stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList()));
+        return summary;
+    }
+
+    // ── Release Result Key ───────────────────────────────
+
+    @Transactional
+    public void releaseResultKey(Long roundId,
+            String callerRole) {
+        if (!"COMPANY_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Company Admin can release result keys");
+        }
+        List<Result> results =
+            resultRepository.findByRoundId(roundId);
+        if (results.isEmpty()) {
+            throw new ResourceNotFoundException(
+                "No results found for round: " + roundId);
+        }
+        results.forEach(r -> r.setResultKeyReleased(true));
+        resultRepository.saveAll(results);
+
+        // Notify all students
+        results.forEach(r -> createNotification(
+            r.getStudentId(),
+            "Result Key Released",
+            "The result key for your exam has been released. "
+                + "View your full scorecard now."));
+    }
+
+    // ── Advance Students in Round ────────────────────────
+
+    @Transactional
+    public RoundResultSummary advanceStudents(
+            Long roundId, AdvanceRoundRequest request,
+            String callerRole) {
+        if (!"COMPANY_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Company Admin can advance students");
+        }
+        List<Result> results =
+            resultRepository.findByRoundId(roundId);
+        if (results.isEmpty()) {
+            throw new ResourceNotFoundException(
+                "No results found for round: " + roundId);
         }
 
-        return result;
-    }
+        double cutoff = request.getCutoffScore() != null
+            ? request.getCutoffScore() : 0.0;
 
-    public List<Result> getRoundResults(Long roundId) {
-        return resultRepository.findByRoundId(roundId);
-    }
+        int totalAttempted = results.size();
+        int advanced = 0;
+        int eliminated = 0;
 
-    public void releaseResultKey(Long roundId) {
-        List<Result> results = resultRepository.findByRoundId(roundId);
         for (Result r : results) {
-            r.setResultKeyReleased(true);
-            resultRepository.save(r);
-
-            notificationRepository.save(Notification.builder()
-                    .userId(r.getStudentId())
-                    .title("Answer Key Released")
-                    .message("Result key for Round " + roundId + " has been released. View your full scorecard.")
-                    .isRead(false)
-                    .build());
-        }
-    }
-
-    public void advanceStudents(Long roundId) {
-        List<Result> results = resultRepository.findByRoundId(roundId);
-        if (results.isEmpty()) return;
-
-        int totalStudents = results.size();
-
-        // Calculate percentile: (students scoring less than this student / total students) * 100
-        for (Result r : results) {
-            long countLower = results.stream().filter(other -> other.getTotalScore() < r.getTotalScore()).count();
-            double percentile = ((double) countLower / totalStudents) * 100.0;
+            // Compute percentile
+            long countLower = results.stream()
+                .filter(other -> other.getTotalScore()
+                    < r.getTotalScore())
+                .count();
+            double percentile = totalAttempted > 0
+                ? ((double) countLower / totalAttempted) * 100.0
+                : 0.0;
             r.setPercentile(percentile);
             resultRepository.save(r);
+
+            // Find enrollment and update status
+            try {
+                List<?> enrollments = restTemplate.getForObject(
+                    enrollmentUrl
+                        + "/api/v1/enrollment/student/"
+                        + r.getStudentId(),
+                    List.class);
+
+                if (enrollments != null) {
+                    for (Object e : enrollments) {
+                        Map<?, ?> enrollment = (Map<?, ?>) e;
+                        if (enrollment.get("roundId") != null
+                            && ((Number) enrollment
+                                .get("roundId")).longValue()
+                                == roundId) {
+
+                            Long enrollmentId =
+                                ((Number) enrollment.get("id"))
+                                    .longValue();
+
+                            String newStatus =
+                                r.getTotalScore() >= cutoff
+                                    ? "ADVANCED" : "ELIMINATED";
+
+                            Map<String, String> statusBody =
+                                Map.of("status", newStatus);
+                            HttpHeaders headers =
+                                new HttpHeaders();
+                            headers.setContentType(
+                                MediaType.APPLICATION_JSON);
+                            HttpEntity<Map<String, String>>
+                                entity = new HttpEntity<>(
+                                    statusBody, headers);
+
+                            restTemplate.exchange(
+                                enrollmentUrl
+                                    + "/api/v1/enrollment/"
+                                    + enrollmentId + "/status",
+                                HttpMethod.PATCH,
+                                entity, Map.class);
+
+                            if ("ADVANCED".equals(newStatus)) {
+                                advanced++;
+                                createNotification(
+                                    r.getStudentId(),
+                                    "Round Result",
+                                    "Congratulations! You have "
+                                        + "advanced to the next "
+                                        + "round. Score: "
+                                        + r.getTotalScore()
+                                        + ", Percentile: "
+                                        + String.format("%.1f",
+                                            percentile) + "%");
+                            } else {
+                                eliminated++;
+                                createNotification(
+                                    r.getStudentId(),
+                                    "Round Result",
+                                    "Thank you for attempting "
+                                        + "the assessment. "
+                                        + "You have not advanced "
+                                        + "to the next round. "
+                                        + "Score: "
+                                        + r.getTotalScore());
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println(
+                    "Warning: Could not update enrollment "
+                        + "for student " + r.getStudentId()
+                        + ": " + e.getMessage());
+            }
         }
 
-        // Fetch cutoff score for round from Drive Service (or default 50.0)
-        double cutoffScore = 50.0;
-        try {
-            // Attempt to query drive service for round details
-            // Fallback stays 50.0
-        } catch (Exception e) {}
-
-        // Fetch enrollments for drive/students to update status
-        for (Result r : results) {
-            boolean passed = r.getTotalScore() >= cutoffScore;
-            String status = passed ? "ADVANCED" : "ELIMINATED";
-
-            // Create Notification
-            notificationRepository.save(Notification.builder()
-                    .userId(r.getStudentId())
-                    .title("Round Advancement Status")
-                    .message("You have been " + status.toLowerCase() + " for Round " + roundId + ". Score: " + r.getTotalScore() + ", Percentile: " + String.format("%.2f", r.getPercentile()))
-                    .isRead(false)
-                    .build());
-        }
+        RoundResultSummary summary = new RoundResultSummary();
+        summary.setRoundId(roundId);
+        summary.setTotalAttempted(totalAttempted);
+        summary.setAdvanced(advanced);
+        summary.setEliminated(eliminated);
+        summary.setResults(results.stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList()));
+        return summary;
     }
 
-    public Result reviewSubjective(Long resultId, SubjectiveReviewRequest request) {
-        Result result = resultRepository.findById(resultId)
-                .orElseThrow(() -> new ResourceNotFoundException("Result not found with id: " + resultId));
+    // ── Subjective Review ────────────────────────────────
 
-        SubjectiveReview review = SubjectiveReview.builder()
-                .resultId(resultId)
-                .questionId(request.getQuestionId())
-                .marksAwarded(request.getMarksAwarded())
-                .reviewedBy(request.getReviewedBy())
-                .build();
+    @Transactional
+    public ResultResponse reviewSubjective(
+            Long resultId,
+            SubjectiveReviewRequest request,
+            String callerRole) {
+        if (!"COMPANY_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Company Admin can review "
+                    + "subjective answers");
+        }
+        Result result = resultRepository.findById(resultId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Result not found: " + resultId));
+
+        // Save review
+        SubjectiveReview review = new SubjectiveReview();
+        review.setResultId(resultId);
+        review.setQuestionId(request.getQuestionId());
+        review.setMarksAwarded(request.getMarksAwarded());
+        review.setReviewedBy(request.getReviewedBy());
         subjectiveReviewRepository.save(review);
 
-        // Sum up subjective marks
-        List<SubjectiveReview> reviews = subjectiveReviewRepository.findByResultId(resultId);
-        double totalSubj = reviews.stream()
-                .mapToDouble(r -> r.getMarksAwarded() != null ? r.getMarksAwarded() : 0.0)
-                .sum();
+        // Recalculate subjective total
+        List<SubjectiveReview> allReviews =
+            subjectiveReviewRepository.findByResultId(resultId);
+        double subjectiveTotal = allReviews.stream()
+            .mapToDouble(SubjectiveReview::getMarksAwarded)
+            .sum();
 
-        result.setSubjectiveScore(totalSubj);
-        result.setTotalScore(result.getMcqScore() + totalSubj);
+        result.setSubjectiveScore(subjectiveTotal);
+        result.setTotalScore(
+            result.getMcqScore() + subjectiveTotal);
         result.setSubjectiveReviewed(true);
+        resultRepository.save(result);
 
-        return resultRepository.save(result);
+        return mapToResponse(result);
     }
 
-    public List<Notification> getUserNotifications(Long userId) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    // ── Notifications ────────────────────────────────────
+
+    public List<NotificationResponse> getNotifications(
+            Long userId) {
+        return notificationRepository
+            .findByUserIdOrderByCreatedAtDesc(userId)
+            .stream()
+            .map(this::mapNotificationToResponse)
+            .collect(Collectors.toList());
     }
 
-    public Notification markNotificationRead(Long notificationId) {
-        Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
+    public NotificationResponse markNotificationRead(
+            Long notificationId) {
+        Notification notification = notificationRepository
+            .findById(notificationId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Notification not found: " + notificationId));
         notification.setRead(true);
-        return notificationRepository.save(notification);
+        return mapNotificationToResponse(
+            notificationRepository.save(notification));
+    }
+
+    // ── Private Helpers ──────────────────────────────────
+
+    private void createNotification(Long userId,
+            String title, String message) {
+        Notification n = new Notification();
+        n.setUserId(userId);
+        n.setTitle(title);
+        n.setMessage(message);
+        n.setRead(false);
+        notificationRepository.save(n);
+    }
+
+    private ResultResponse mapToResponse(Result r) {
+        ResultResponse resp = new ResultResponse();
+        resp.setId(r.getId());
+        resp.setStudentId(r.getStudentId());
+        resp.setRoundId(r.getRoundId());
+        resp.setSessionId(r.getSessionId());
+        resp.setMcqScore(r.getMcqScore());
+        resp.setSubjectiveScore(r.getSubjectiveScore());
+        resp.setTotalScore(r.getTotalScore());
+        resp.setPercentile(r.getPercentile());
+        resp.setSubjectiveReviewed(r.isSubjectiveReviewed());
+        resp.setResultKeyReleased(r.isResultKeyReleased());
+        resp.setCreatedAt(r.getCreatedAt());
+        return resp;
+    }
+
+    private NotificationResponse mapNotificationToResponse(
+            Notification n) {
+        NotificationResponse resp = new NotificationResponse();
+        resp.setId(n.getId());
+        resp.setUserId(n.getUserId());
+        resp.setTitle(n.getTitle());
+        resp.setMessage(n.getMessage());
+        resp.setRead(n.isRead());
+        resp.setCreatedAt(n.getCreatedAt());
+        return resp;
     }
 }

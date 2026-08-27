@@ -16,3 +16,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+services:
+  exam-url: http://localhost:8084
+  drive-url: http://localhost:8082
+  enrollment-url: http://localhost:8083

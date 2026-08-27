@@ -1,37 +1,36 @@
 package com.recruitr.results.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "subjective_reviews")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class SubjectiveReview {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "result_id", nullable = false)
     private Long resultId;
 
-    @Column(nullable = false)
+    @Column(name = "question_id", nullable = false)
     private Long questionId;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "reviewed_answer", columnDefinition = "TEXT")
     private String reviewedAnswer;
 
-    @Column
+    @Column(name = "marks_awarded", nullable = false)
     private Double marksAwarded;
 
-    @Column
-    private Long reviewedBy; // companyAdminId
+    @Column(name = "reviewed_by", nullable = false)
+    private Long reviewedBy;
 
-    @Column
+    @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
     @PrePersist

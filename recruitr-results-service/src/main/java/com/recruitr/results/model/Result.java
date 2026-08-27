@@ -1,58 +1,54 @@
 package com.recruitr.results.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "results", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"studentId", "roundId"})
-})
+@Table(name = "results",
+    uniqueConstraints = @UniqueConstraint(
+        columnNames = {"student_id", "round_id"}))
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Result {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "student_id", nullable = false)
     private Long studentId;
 
-    @Column(nullable = false)
+    @Column(name = "round_id", nullable = false)
     private Long roundId;
 
-    @Column(nullable = false)
+    @Column(name = "session_id", nullable = false)
     private Long sessionId;
 
-    @Column(nullable = false)
+    @Column(name = "mcq_score", nullable = false)
     private Double mcqScore = 0.0;
 
-    @Column(nullable = false)
+    @Column(name = "subjective_score", nullable = false)
     private Double subjectiveScore = 0.0;
 
-    @Column(nullable = false)
+    @Column(name = "total_score", nullable = false)
     private Double totalScore = 0.0;
 
-    @Column
+    @Column(name = "percentile")
     private Double percentile;
 
-    @Column(nullable = false)
+    @Column(name = "subjective_reviewed", nullable = false)
     private boolean subjectiveReviewed = false;
 
-    @Column(nullable = false)
+    @Column(name = "result_key_released", nullable = false)
     private boolean resultKeyReleased = false;
 
-    @Column
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        if (this.mcqScore == null) this.mcqScore = 0.0;
-        if (this.subjectiveScore == null) this.subjectiveScore = 0.0;
-        if (this.totalScore == null) this.totalScore = 0.0;
     }
 }
