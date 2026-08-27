@@ -1,20 +1,18 @@
 package com.recruitr.exam.service;
 
 import com.recruitr.exam.dto.*;
-import com.recruitr.exam.exception.ConflictException;
-import com.recruitr.exam.exception.ResourceNotFoundException;
+import com.recruitr.exam.exception.*;
 import com.recruitr.exam.model.*;
 import com.recruitr.exam.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,207 +23,323 @@ public class ExamService {
     private final AttemptLogRepository attemptLogRepository;
     private final RestTemplate restTemplate;
 
+    @Value("${services.enrollment-url}")
+    private String enrollmentUrl;
+
+    @Value("${services.drive-url}")
+    private String driveUrl;
+
+    @Value("${services.results-url}")
+    private String resultsUrl;
+
+    // ── Start Exam ───────────────────────────────────────
+
+    @Transactional
     public StartExamResponse startExam(StartExamRequest request) {
-        Long studentId = request.getStudentId();
-        Long roundId = request.getRoundId();
 
         // 1. Check eligibility via Enrollment Service
-        String eligibilityUrl = "http://localhost:8083/api/v1/eligibility/check?studentId=" + studentId + "&roundId=" + roundId;
-        try {
-            ResponseEntity<Map> eligResp = restTemplate.getForEntity(eligibilityUrl, Map.class);
-            if (eligResp.getBody() == null || !Boolean.TRUE.equals(eligResp.getBody().get("eligible"))) {
-                throw new RuntimeException("Student is not eligible for this round");
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Eligibility check failed: " + e.getMessage());
+        String eligibilityUrl = enrollmentUrl
+            + "/api/v1/eligibility/check?studentId="
+            + request.getStudentId()
+            + "&roundId=" + request.getRoundId();
+
+        Map<?, ?> eligibility = restTemplate.getForObject(
+                eligibilityUrl, Map.class);
+
+        if (eligibility == null
+                || !Boolean.TRUE.equals(
+                    eligibility.get("eligible"))) {
+            String reason = eligibility != null
+                ? (String) eligibility.get("reason")
+                : "Eligibility check failed";
+            throw new AccessDeniedException(
+                "Student is not eligible: " + reason);
         }
 
-        // 2. Check if ExamSession already exists for (studentId, roundId)
-        if (sessionRepository.existsByStudentIdAndRoundId(studentId, roundId)) {
-            throw new ConflictException("Attempt already exists");
+        // 2. Check attempt locking
+        if (sessionRepository.existsByStudentIdAndRoundId(
+                request.getStudentId(), request.getRoundId())) {
+            throw new ConflictException(
+                "Attempt already exists for this student "
+                    + "and round. Re-attempting is not allowed.");
         }
 
-        // 3. Create ExamSession
-        ExamSession session = ExamSession.builder()
-                .studentId(studentId)
-                .roundId(roundId)
-                .status(SessionStatus.IN_PROGRESS)
-                .tabSwitchCount(0)
-                .fullscreenExitCount(0)
-                .build();
-        session = sessionRepository.save(session);
+        // 3. Fetch round details from Drive Service
+        String roundUrl = driveUrl
+            + "/api/v1/drives/0/rounds/"
+            + request.getRoundId();
 
-        // Log EXAM_STARTED
-        attemptLogRepository.save(AttemptLog.builder()
-                .sessionId(session.getId())
-                .eventType(EventType.EXAM_STARTED)
-                .eventTime(LocalDateTime.now())
-                .metadata("Exam started by student " + studentId)
-                .build());
+        Map<?, ?> roundData = restTemplate.getForObject(
+                roundUrl, Map.class);
 
-        // 4. Fetch questions from Drive Service
-        Long driveId = request.getDriveId();
-        String questionsUrl = "http://localhost:8082/api/v1/drives/" + driveId + "/rounds/" + roundId + "/questions";
-        List<Map<String, Object>> questions = new ArrayList<>();
-        try {
-            ResponseEntity<List> qResp = restTemplate.getForEntity(questionsUrl, List.class);
-            if (qResp.getBody() != null) {
-                for (Object item : qResp.getBody()) {
-                    if (item instanceof Map) {
-                        Map<String, Object> qMap = new HashMap<>((Map<String, Object>) item);
-                        // Hide correctOption from student
-                        qMap.remove("correctOption");
-                        questions.add(qMap);
-                    }
+        Integer durationMinutes = roundData != null
+            ? (Integer) roundData.get("durationMinutes")
+            : 60;
+
+        Long driveId = roundData != null
+                && roundData.get("driveId") != null
+            ? Long.valueOf(roundData.get("driveId").toString())
+            : null;
+
+        // 4. Fetch questions for the round
+        String questionsUrl = driveUrl
+            + "/api/v1/drives/"
+            + (driveId != null ? driveId : "0")
+            + "/rounds/" + request.getRoundId()
+            + "/questions";
+
+        List<?> rawQuestions = restTemplate.getForObject(
+                questionsUrl, List.class);
+
+        List<Map<?, ?>> questions = rawQuestions != null
+            ? rawQuestions.stream()
+                .map(q -> (Map<?, ?>) q)
+                .collect(Collectors.toList())
+            : new ArrayList<>();
+
+        // 5. Shuffle using Fisher-Yates seeded with studentId
+        List<Map<?, ?>> shuffled = new ArrayList<>(questions);
+        Random rng = new Random(request.getStudentId());
+        for (int i = shuffled.size() - 1; i > 0; i--) {
+            int j = rng.nextInt(i + 1);
+            Map<?, ?> temp = shuffled.get(i);
+            shuffled.set(i, shuffled.get(j));
+            shuffled.set(j, temp);
+        }
+
+        // 6. Create exam session
+        ExamSession session = new ExamSession();
+        session.setStudentId(request.getStudentId());
+        session.setRoundId(request.getRoundId());
+        session.setStatus(SessionStatus.IN_PROGRESS);
+        session.setTabSwitchCount(0);
+        session.setFullscreenExitCount(0);
+        ExamSession saved = sessionRepository.save(session);
+
+        // 7. Log EXAM_STARTED event
+        logEvent(saved.getId(), EventType.EXAM_STARTED,
+                "Exam started for student "
+                    + request.getStudentId());
+
+        // 8. Map questions to DTO — exclude correctOption
+        List<QuestionDto> questionDtos = shuffled.stream()
+            .map(q -> {
+                QuestionDto dto = new QuestionDto();
+                if (q.get("id") != null) {
+                    dto.setId(Long.valueOf(
+                        q.get("id").toString()));
                 }
-            }
-        } catch (Exception e) {
-            // fallback empty list if error
-        }
-
-        // 5. Shuffle questions using Fisher-Yates seeded with studentId
-        Collections.shuffle(questions, new Random(studentId));
-
-        // Fetch round details to get duration
-        Integer durationMinutes = 60; // default fallback
-        try {
-            String roundUrl = "http://localhost:8082/api/v1/drives/" + driveId + "/rounds";
-            ResponseEntity<List> roundsResp = restTemplate.getForEntity(roundUrl, List.class);
-            if (roundsResp.getBody() != null) {
-                for (Object item : roundsResp.getBody()) {
-                    if (item instanceof Map) {
-                        Map rMap = (Map) item;
-                        if (roundId.equals(Long.valueOf(rMap.get("id").toString()))) {
-                            durationMinutes = Integer.valueOf(rMap.get("durationMinutes").toString());
-                            break;
-                        }
-                    }
+                dto.setQuestionText(
+                    (String) q.get("questionText"));
+                dto.setQuestionType(
+                    q.get("questionType") != null
+                        ? q.get("questionType").toString()
+                        : null);
+                dto.setOptionA((String) q.get("optionA"));
+                dto.setOptionB((String) q.get("optionB"));
+                dto.setOptionC((String) q.get("optionC"));
+                dto.setOptionD((String) q.get("optionD"));
+                if (q.get("marks") != null) {
+                    dto.setMarks(Double.valueOf(
+                        q.get("marks").toString()));
                 }
-            }
-        } catch (Exception e) {
-            // fallback default
-        }
+                dto.setTags((String) q.get("tags"));
+                // correctOption intentionally excluded
+                return dto;
+            })
+            .collect(Collectors.toList());
 
-        return StartExamResponse.builder()
-                .sessionId(session.getId())
-                .questions(questions)
-                .durationMinutes(durationMinutes)
-                .startedAt(session.getStartedAt())
-                .build();
+        // 9. Build response
+        StartExamResponse response = new StartExamResponse();
+        response.setSessionId(saved.getId());
+        response.setRoundId(request.getRoundId());
+        response.setDurationMinutes(durationMinutes);
+        response.setStartedAt(saved.getStartedAt());
+        response.setQuestions(questionDtos);
+        return response;
     }
 
-    public WarningResponse issueWarning(Long sessionId, WarningRequest request) {
-        ExamSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+    // ── Process Warning ──────────────────────────────────
 
-        String warningType = request.getWarningType();
-        EventType eventType;
-        if ("TAB_SWITCH".equalsIgnoreCase(warningType)) {
-            session.setTabSwitchCount(session.getTabSwitchCount() + 1);
-            eventType = EventType.TAB_SWITCHED;
-        } else {
-            session.setFullscreenExitCount(session.getFullscreenExitCount() + 1);
-            eventType = EventType.FULLSCREEN_EXIT;
+    @Transactional
+    public WarningResponse processWarning(Long sessionId,
+            WarningRequest request) {
+
+        ExamSession session = findActiveSession(sessionId);
+
+        if ("TAB_SWITCH".equals(request.getWarningType())) {
+            session.setTabSwitchCount(
+                session.getTabSwitchCount() + 1);
+            logEvent(sessionId, EventType.TAB_SWITCHED,
+                "Tab switch #" + session.getTabSwitchCount());
+        } else if ("FULLSCREEN_EXIT".equals(
+                request.getWarningType())) {
+            session.setFullscreenExitCount(
+                session.getFullscreenExitCount() + 1);
+            logEvent(sessionId, EventType.FULLSCREEN_EXIT,
+                "Fullscreen exit #"
+                    + session.getFullscreenExitCount());
         }
 
-        int totalWarnings = session.getTabSwitchCount() + session.getFullscreenExitCount();
+        int totalWarnings = session.getTabSwitchCount()
+                + session.getFullscreenExitCount();
 
-        attemptLogRepository.save(AttemptLog.builder()
-                .sessionId(sessionId)
-                .eventType(eventType)
-                .eventTime(LocalDateTime.now())
-                .metadata("Warning count: " + totalWarnings)
-                .build());
-
-        boolean autoSubmitted = false;
-        if (totalWarnings >= 3) {
-            session.setStatus(SessionStatus.AUTO_SUBMITTED);
-            session.setSubmittedAt(LocalDateTime.now());
-            autoSubmitted = true;
-
-            attemptLogRepository.save(AttemptLog.builder()
-                    .sessionId(sessionId)
-                    .eventType(EventType.AUTO_SUBMITTED)
-                    .eventTime(LocalDateTime.now())
-                    .metadata("Auto submitted due to 3 warnings")
-                    .build());
-
-            // Trigger scoring via Results Service
-            triggerScoring(session.getId(), session.getStudentId(), session.getRoundId());
-        }
+        logEvent(sessionId, EventType.WARNING_ISSUED,
+            "Total warnings: " + totalWarnings);
 
         sessionRepository.save(session);
 
-        return WarningResponse.builder()
-                .warningCount(totalWarnings)
-                .autoSubmitted(autoSubmitted)
-                .build();
+        WarningResponse response = new WarningResponse();
+        response.setSessionId(sessionId);
+        response.setTotalWarnings(totalWarnings);
+
+        // Auto-submit if 3 or more total warnings
+        if (totalWarnings >= 3) {
+            autoSubmit(session);
+            response.setAutoSubmitted(true);
+            response.setMessage(
+                "Exam auto-submitted due to repeated "
+                    + "integrity violations.");
+        } else {
+            response.setAutoSubmitted(false);
+            response.setMessage("Warning recorded. "
+                + (3 - totalWarnings)
+                + " warning(s) remaining before auto-submit.");
+        }
+
+        return response;
     }
 
-    public SubmitExamResponse submitExam(Long sessionId, SubmitExamRequest request) {
-        ExamSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+    // ── Submit Exam ──────────────────────────────────────
 
-        if (session.getStatus() == SessionStatus.SUBMITTED || session.getStatus() == SessionStatus.AUTO_SUBMITTED) {
-            throw new ConflictException("Exam already submitted");
+    @Transactional
+    public SubmitExamResponse submitExam(Long sessionId,
+            SubmitExamRequest request) {
+
+        ExamSession session = sessionRepository
+                .findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Session not found: " + sessionId));
+
+        if (session.getStatus() == SessionStatus.SUBMITTED
+                || session.getStatus()
+                    == SessionStatus.AUTO_SUBMITTED) {
+            throw new ConflictException(
+                "Exam has already been submitted.");
         }
 
-        if (request != null && request.getResponses() != null) {
-            for (SubmitExamRequest.SingleResponseDto dto : request.getResponses()) {
-                Response resp = Response.builder()
-                        .sessionId(sessionId)
-                        .questionId(dto.getQuestionId())
-                        .selectedOption(dto.getSelectedOption())
-                        .subjectiveAnswer(dto.getSubjectiveAnswer())
-                        .answeredAt(LocalDateTime.now())
-                        .build();
-                responseRepository.save(resp);
-            }
+        // Save all responses
+        if (request.getResponses() != null) {
+            List<Response> responses = request.getResponses()
+                    .stream()
+                    .map(r -> {
+                        Response resp = new Response();
+                        resp.setSessionId(sessionId);
+                        resp.setQuestionId(r.getQuestionId());
+                        resp.setSelectedOption(
+                            r.getSelectedOption());
+                        resp.setSubjectiveAnswer(
+                            r.getSubjectiveAnswer());
+                        return resp;
+                    })
+                    .collect(Collectors.toList());
+            responseRepository.saveAll(responses);
         }
 
+        // Update session
         session.setStatus(SessionStatus.SUBMITTED);
         session.setSubmittedAt(LocalDateTime.now());
         sessionRepository.save(session);
 
-        attemptLogRepository.save(AttemptLog.builder()
-                .sessionId(sessionId)
-                .eventType(EventType.SUBMITTED)
-                .eventTime(LocalDateTime.now())
-                .metadata("Exam submitted successfully by student")
-                .build());
+        logEvent(sessionId, EventType.SUBMITTED,
+            "Student submitted the exam manually.");
 
-        // Trigger scoring
-        triggerScoring(session.getId(), session.getStudentId(), session.getRoundId());
+        // Trigger scoring in Results Service asynchronously
+        // (fire and forget — we don't block on the result)
+        try {
+            Map<String, Object> scoreRequest = Map.of(
+                "sessionId", sessionId,
+                "studentId", session.getStudentId(),
+                "roundId",   session.getRoundId()
+            );
+            restTemplate.postForObject(
+                resultsUrl + "/api/v1/results/score",
+                scoreRequest, Map.class);
+        } catch (Exception e) {
+            // Log but don't fail the submission if
+            // results service is temporarily unavailable
+            System.err.println(
+                "Warning: Could not trigger scoring: "
+                    + e.getMessage());
+        }
 
-        return SubmitExamResponse.builder()
-                .message("Submitted successfully")
-                .submittedAt(session.getSubmittedAt())
-                .build();
+        SubmitExamResponse response = new SubmitExamResponse();
+        response.setMessage("Exam submitted successfully.");
+        response.setSubmittedAt(session.getSubmittedAt());
+        response.setSessionId(sessionId);
+        return response;
     }
+
+    // ── Get Session ──────────────────────────────────────
 
     public ExamSession getSession(Long sessionId) {
         return sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Session not found: " + sessionId));
     }
 
-    public List<Response> getResponsesForSession(Long sessionId) {
+    // ── Get Responses for Session ────────────────────────
+
+    public List<Response> getResponsesForSession(
+            Long sessionId) {
         return responseRepository.findBySessionId(sessionId);
     }
 
-    private void triggerScoring(Long sessionId, Long studentId, Long roundId) {
-        try {
-            String scoreUrl = "http://localhost:8085/api/v1/results/score";
-            Map<String, Object> body = Map.of(
-                    "sessionId", sessionId,
-                    "studentId", studentId,
-                    "roundId", roundId
-            );
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            restTemplate.postForEntity(scoreUrl, entity, Map.class);
-        } catch (Exception e) {
-            // Log scoring trigger failure
+    // ── Private Helpers ──────────────────────────────────
+
+    private ExamSession findActiveSession(Long sessionId) {
+        ExamSession session = sessionRepository
+                .findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Session not found: " + sessionId));
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new BadRequestException(
+                "Session is no longer active. Status: "
+                    + session.getStatus());
         }
+        return session;
+    }
+
+    private void autoSubmit(ExamSession session) {
+        session.setStatus(SessionStatus.AUTO_SUBMITTED);
+        session.setSubmittedAt(LocalDateTime.now());
+        sessionRepository.save(session);
+        logEvent(session.getId(), EventType.AUTO_SUBMITTED,
+            "Auto-submitted due to warning limit reached.");
+
+        // Trigger scoring
+        try {
+            Map<String, Object> scoreRequest = Map.of(
+                "sessionId", session.getId(),
+                "studentId", session.getStudentId(),
+                "roundId",   session.getRoundId()
+            );
+            restTemplate.postForObject(
+                resultsUrl + "/api/v1/results/score",
+                scoreRequest, Map.class);
+        } catch (Exception e) {
+            System.err.println(
+                "Warning: Could not trigger scoring "
+                    + "after auto-submit: " + e.getMessage());
+        }
+    }
+
+    private void logEvent(Long sessionId,
+            EventType eventType, String metadata) {
+        AttemptLog log = new AttemptLog();
+        log.setSessionId(sessionId);
+        log.setEventType(eventType);
+        log.setMetadata(metadata);
+        attemptLogRepository.save(log);
     }
 }

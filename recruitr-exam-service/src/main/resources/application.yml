@@ -16,3 +16,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+services:
+  enrollment-url: http://localhost:8083
+  drive-url: http://localhost:8082
+  results-url: http://localhost:8085

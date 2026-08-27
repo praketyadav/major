@@ -1,56 +1,46 @@
 package com.recruitr.exam.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "exam_sessions", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"studentId", "roundId"})
-})
+@Table(name = "exam_sessions",
+    uniqueConstraints = @UniqueConstraint(
+        columnNames = {"student_id", "round_id"}))
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class ExamSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "student_id", nullable = false)
     private Long studentId;
 
-    @Column(nullable = false)
+    @Column(name = "round_id", nullable = false)
     private Long roundId;
 
-    @Column
+    @Column(name = "started_at")
     private LocalDateTime startedAt;
 
-    @Column
+    @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SessionStatus status;
+    private SessionStatus status = SessionStatus.IN_PROGRESS;
 
-    @Column(nullable = false)
+    @Column(name = "tab_switch_count", nullable = false)
     private Integer tabSwitchCount = 0;
 
-    @Column(nullable = false)
+    @Column(name = "fullscreen_exit_count", nullable = false)
     private Integer fullscreenExitCount = 0;
 
     @PrePersist
     protected void onCreate() {
         this.startedAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = SessionStatus.IN_PROGRESS;
-        }
-        if (this.tabSwitchCount == null) {
-            this.tabSwitchCount = 0;
-        }
-        if (this.fullscreenExitCount == null) {
-            this.fullscreenExitCount = 0;
-        }
     }
 }
