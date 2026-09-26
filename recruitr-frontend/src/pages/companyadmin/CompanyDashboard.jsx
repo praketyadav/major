@@ -1700,14 +1700,6 @@ const CompanyDashboard = () => {
           padding: 32, background: theme.bg, minHeight: 'calc(100vh - 60px)',
           overflowY: 'auto',
         }}>
-          {/* Metadata Indicators */}
-          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Tag color="blue" style={{ fontSize: 11 }}>v2.4.0</Tag>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10B981', fontSize: 11 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
-              Cluster: us-east-prod-4
-            </div>
-          </div>
           {/* Breadcrumb */}
           <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: theme.textMuted, fontSize: 12 }}>Company Console</span>
