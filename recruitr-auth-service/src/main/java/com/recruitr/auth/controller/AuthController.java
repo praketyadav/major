@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -60,10 +61,38 @@ public class AuthController {
     }
 
     // Requires X-User-Role: SUPER_ADMIN
+    @PatchMapping("/users/{id}/reactivate")
+    public ResponseEntity<UserResponse> reactivateUser(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Role") String callerRole) {
+        return ResponseEntity.ok(
+                authService.reactivateUser(id, callerRole));
+    }
+
+    // Requires X-User-Role: SUPER_ADMIN
+    @PatchMapping("/users/{id}/password")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            @RequestHeader("X-User-Role") String callerRole) {
+        authService.resetPassword(id, request.get("password"), callerRole);
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+    }
+
+    // Requires X-User-Role: SUPER_ADMIN
     @GetMapping("/users/analytics")
     public ResponseEntity<Map<String, Long>> getAnalytics(
             @RequestHeader("X-User-Role") String callerRole) {
         return ResponseEntity.ok(
                 authService.getAnalytics(callerRole));
+    }
+
+    // List users by role (SUPER_ADMIN)
+    @GetMapping("/users")
+    public ResponseEntity<List<UserResponse>> getUsersByRole(
+            @RequestParam("role") String role,
+            @RequestHeader("X-User-Role") String callerRole) {
+        return ResponseEntity.ok(
+                authService.getUsersByRole(role, callerRole));
     }
 }
