@@ -129,6 +129,31 @@ public class AuthService {
         return mapToResponse(user);
     }
 
+    public UserResponse reactivateUser(Long id, String callerRole) {
+        if (!"SUPER_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Super Admin can reactivate accounts");
+        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with id: " + id));
+        user.setActive(true);
+        userRepository.save(user);
+        return mapToResponse(user);
+    }
+
+    public void resetPassword(Long id, String newPassword, String callerRole) {
+        if (!"SUPER_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Super Admin can reset user passwords");
+        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with id: " + id));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     public Map<String, Long> getAnalytics(String callerRole) {
         if (!"SUPER_ADMIN".equals(callerRole)) {
             throw new AccessDeniedException(
@@ -146,6 +171,19 @@ public class AuthService {
             "totalCompanies", totalCompanies,
             "totalStudents", totalStudents
         );
+    }
+
+    public java.util.List<UserResponse> getUsersByRole(
+            String roleFilter, String callerRole) {
+        if (!"SUPER_ADMIN".equals(callerRole)) {
+            throw new AccessDeniedException(
+                "Only Super Admin can list users");
+        }
+        Role role = Role.valueOf(roleFilter);
+        return userRepository.findByRole(role).stream()
+                .map(this::mapToResponse)
+                .collect(java.util.stream.Collectors
+                    .toList());
     }
 
     private UserResponse mapToResponse(User user) {
