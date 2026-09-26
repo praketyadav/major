@@ -1746,7 +1746,6 @@ const CompanyDashboard = () => {
           background-color: #18181B !important;
         }
         .company-sidebar-menu .ant-menu-item-selected {
-          /* initial header styling phase */
           background-color: rgba(30, 58, 138, 0.5) !important;
           border: 1px solid rgba(59, 130, 246, 0.8) !important;
           color: #FFFFFF !important;
