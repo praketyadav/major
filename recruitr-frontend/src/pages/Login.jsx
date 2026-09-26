@@ -1,11 +1,80 @@
 import React, { useState } from 'react';
-import { Card, Form, Input, Button, Alert, Typography } from 'antd';
+import { Form, Input, Button, Alert, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import { useAuth } from '../auth/AuthContext';
 
 const { Title, Text } = Typography;
 
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS — Extracted from Stitch "Recruitr Dark Mode
+   Login (copy)" project (Obsidian Flux design system)
+   ═══════════════════════════════════════════════════════════ */
+const TOKENS = {
+  // Canvas & Elevation
+  canvasBase: '#0e0e11',       // surface-container-lowest
+  surface: '#121216',           // card surface
+  surfaceRecessed: '#09090B',   // input wells
+  borderSubtle: '#27272A',      // dividers & borders
+  outlineVariant: '#424656',    // top-edge highlights
+
+  // Brand & Action
+  primaryBlue: '#0066FF',
+  deepCobalt: '#0047BB',
+
+  // Text
+  textPrimary: '#FAFAFA',
+  textSecondary: '#A1A1AA',
+  placeholderText: 'rgba(140, 144, 161, 0.7)', // outline/70
+
+  // Glow & Focus
+  focusRing: '0 0 0 1px #0066FF, 0 0 16px -4px rgba(0, 102, 255, 0.4)',
+  buttonGlow: '0 0 20px rgba(0, 102, 255, 0.25)',
+  buttonGlowHover: '0 0 25px rgba(0, 102, 255, 0.4)',
+
+  // Spacing
+  cardPadding: 40,             // sm:p-10 = 40px
+  cardMaxWidth: 440,
+  cardRadius: 16,              // rounded-2xl
+  inputHeight: 44,             // h-11
+  inputRadius: 8,              // rounded-lg
+
+  // Typography
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  headlineLg: { fontSize: 32, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: '40px' },
+  labelMd: { fontSize: 14, fontWeight: 500, letterSpacing: '0em', lineHeight: '20px' },
+  bodyMd: { fontSize: 14, fontWeight: 400, letterSpacing: '0em', lineHeight: '20px' },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   INLINE SVG — Recruitr Emblem (from Stitch screen asset)
+   ═══════════════════════════════════════════════════════════ */
+const RecruitrEmblem = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="40" height="40" fill="none">
+    <defs>
+      <linearGradient id="rec-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#0066FF" />
+        <stop offset="100%" stopColor="#0047BB" />
+      </linearGradient>
+      <filter id="rec-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+    <rect width="48" height="48" rx="12" fill="#121216" stroke="#27272A" strokeWidth="1" />
+    <rect x="3" y="3" width="42" height="42" rx="9" fill="url(#rec-grad)" fillOpacity="0.12" />
+    <path
+      d="M15 14H25C28.866 14 32 17.134 32 21C32 24.3137 29.697 27.086 26.6 27.8L32.5 34H26.8L21.5 28H19V34H15V14ZM19 18V24H24.8C26.5673 24 28 22.6569 28 21C28 19.3431 26.5673 18 24.8 18H19Z"
+      fill="url(#rec-grad)"
+      filter="url(#rec-glow)"
+    />
+    <circle cx="34" cy="14" r="3" fill="#0066FF" filter="url(#rec-glow)" />
+  </svg>
+);
+
+/* ═══════════════════════════════════════════════════════════
+   LOGIN COMPONENT
+   ═══════════════════════════════════════════════════════════ */
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -37,55 +106,426 @@ const Login = () => {
           navigate('/login');
       }
     } catch (err) {
-      setErrorMsg('Invalid credentials');
+      setErrorMsg(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Invalid credentials'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1890ff 0%, #001529 100%)'
-    }}>
-      <Card style={{ width: 400, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Title level={2} style={{ margin: 0, color: '#1890ff' }}>Recruitr</Title>
-          <Text type="secondary">UPES Campus Placement Mock Assessment Platform</Text>
+    <>
+      {/* ── Google Fonts Preconnect ─────────────────────── */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
+
+      {/* ── Full-Screen Canvas ─────────────────────────── */}
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: TOKENS.canvasBase,
+          fontFamily: TOKENS.fontFamily,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Layer 1: 24px Architectural Grid */}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            backgroundImage:
+              'linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),' +
+              'linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+            opacity: 0.6,
+            zIndex: 0,
+          }}
+        />
+
+        {/* Layer 2: Radial Blue Glow */}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            background:
+              'radial-gradient(circle at 50% 30%, rgba(0,102,255,0.08) 0%, rgba(15,15,18,0) 65%)',
+            zIndex: 0,
+          }}
+        />
+
+        {/* ── Card Container ────────────────────────────── */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            width: '100%',
+            maxWidth: TOKENS.cardMaxWidth,
+            padding: '0 4px',
+          }}
+        >
+          {/* Ambient Underglow */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: -6,
+              background:
+                'linear-gradient(to bottom, rgba(0,102,255,0.20) 0%, transparent 100%)',
+              borderRadius: 24,
+              filter: 'blur(16px)',
+              opacity: 0.6,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Card Surface */}
+          <div
+            style={{
+              position: 'relative',
+              background: TOKENS.surface,
+              borderRadius: TOKENS.cardRadius,
+              padding: TOKENS.cardPadding,
+              boxShadow:
+                '0 24px 48px -12px rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(12px)',
+            }}
+          >
+            {/* Top Edge Highlight */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                background:
+                  'linear-gradient(to right, transparent, rgba(66,70,86,0.4), transparent)',
+                borderRadius: `${TOKENS.cardRadius}px ${TOKENS.cardRadius}px 0 0`,
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* ── Header: Emblem + Wordmark + Subtitle ──── */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                marginBottom: 32,
+              }}
+            >
+              {/* Emblem Container */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 48,
+                  height: 48,
+                  marginBottom: 16,
+                  borderRadius: 12,
+                  background: TOKENS.surfaceRecessed,
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+                  overflow: 'hidden',
+                }}
+              >
+                <RecruitrEmblem />
+              </div>
+
+              {/* Wordmark */}
+              <h1
+                style={{
+                  margin: 0,
+                  color: TOKENS.textPrimary,
+                  fontFamily: TOKENS.fontFamily,
+                  ...TOKENS.headlineLg,
+                }}
+              >
+                Recruitr
+              </h1>
+
+              {/* Subtitle */}
+              <p
+                style={{
+                  margin: '8px 0 0 0',
+                  color: TOKENS.textSecondary,
+                  fontFamily: TOKENS.fontFamily,
+                  ...TOKENS.bodyMd,
+                  maxWidth: 340,
+                  lineHeight: '22px',
+                }}
+              >
+                A Multi-Tenant Campus Placement Mock Assessment Platform
+              </p>
+            </div>
+
+            {/* ── Error Alert ───────────────────────────── */}
+            {errorMsg && (
+              <Alert
+                message={errorMsg}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setErrorMsg('')}
+                style={{
+                  marginBottom: 20,
+                  background: 'rgba(147,0,10,0.15)',
+                  border: '1px solid rgba(255,180,171,0.25)',
+                  borderRadius: TOKENS.inputRadius,
+                  color: '#ffb4ab',
+                }}
+              />
+            )}
+
+            {/* ── Credential Form ───────────────────────── */}
+            <Form
+              layout="vertical"
+              onFinish={onFinish}
+              requiredMark={false}
+              style={{ fontFamily: TOKENS.fontFamily }}
+            >
+              {/* Email Field */}
+              <Form.Item
+                label={
+                  <span
+                    style={{
+                      color: TOKENS.textPrimary,
+                      ...TOKENS.labelMd,
+                      fontFamily: TOKENS.fontFamily,
+                    }}
+                  >
+                    Email Address
+                  </span>
+                }
+                name="email"
+                rules={[
+                  { required: true, message: 'Email is required' },
+                  { type: 'email', message: 'Enter a valid email' },
+                ]}
+                style={{ marginBottom: 20 }}
+              >
+                <Input
+                  placeholder="user@domain.com"
+                  autoComplete="email"
+                  style={{
+                    height: TOKENS.inputHeight,
+                    background: TOKENS.surfaceRecessed,
+                    border: 'none',
+                    borderRadius: TOKENS.inputRadius,
+                    color: TOKENS.textPrimary,
+                    fontFamily: TOKENS.fontFamily,
+                    fontSize: 14,
+                    padding: '0 16px',
+                  }}
+                  styles={{
+                    input: {
+                      background: 'transparent',
+                      color: TOKENS.textPrimary,
+                      fontFamily: TOKENS.fontFamily,
+                    },
+                  }}
+                  onFocus={(e) => {
+                    e.target.parentElement.style.background = TOKENS.canvasBase;
+                    e.target.parentElement.style.boxShadow = TOKENS.focusRing;
+                  }}
+                  onBlur={(e) => {
+                    e.target.parentElement.style.background = TOKENS.surfaceRecessed;
+                    e.target.parentElement.style.boxShadow = 'none';
+                  }}
+                />
+              </Form.Item>
+
+              {/* Password Field */}
+              <Form.Item
+                label={
+                  <span
+                    style={{
+                      color: TOKENS.textPrimary,
+                      ...TOKENS.labelMd,
+                      fontFamily: TOKENS.fontFamily,
+                    }}
+                  >
+                    Password
+                  </span>
+                }
+                name="password"
+                rules={[
+                  { required: true, message: 'Password is required' },
+                ]}
+                style={{ marginBottom: 24 }}
+              >
+                <Input.Password
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  style={{
+                    height: TOKENS.inputHeight,
+                    background: TOKENS.surfaceRecessed,
+                    border: 'none',
+                    borderRadius: TOKENS.inputRadius,
+                    color: TOKENS.textPrimary,
+                    fontFamily: TOKENS.fontFamily,
+                    fontSize: 14,
+                    padding: '0 16px',
+                  }}
+                  styles={{
+                    input: {
+                      background: 'transparent',
+                      color: TOKENS.textPrimary,
+                      fontFamily: TOKENS.fontFamily,
+                    },
+                  }}
+                  onFocus={(e) => {
+                    const wrapper = e.target.closest('.ant-input-affix-wrapper');
+                    if (wrapper) {
+                      wrapper.style.background = TOKENS.canvasBase;
+                      wrapper.style.boxShadow = TOKENS.focusRing;
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const wrapper = e.target.closest('.ant-input-affix-wrapper');
+                    if (wrapper) {
+                      wrapper.style.background = TOKENS.surfaceRecessed;
+                      wrapper.style.boxShadow = 'none';
+                    }
+                  }}
+                />
+              </Form.Item>
+
+              {/* Submit Button */}
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button
+                  htmlType="submit"
+                  loading={loading}
+                  block
+                  style={{
+                    height: TOKENS.inputHeight,
+                    border: 'none',
+                    borderRadius: TOKENS.inputRadius,
+                    background:
+                      'linear-gradient(135deg, #0066FF 0%, #0047BB 100%)',
+                    color: TOKENS.textPrimary,
+                    fontFamily: TOKENS.fontFamily,
+                    ...TOKENS.labelMd,
+                    boxShadow: TOKENS.buttonGlow,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = TOKENS.buttonGlowHover;
+                    e.currentTarget.style.filter = 'brightness(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = TOKENS.buttonGlow;
+                    e.currentTarget.style.filter = 'none';
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'scale(0.99)';
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  Log In
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
         </div>
+      </div>
 
-        {errorMsg && (
-          <Alert message={errorMsg} type="error" showIcon style={{ marginBottom: 16 }} />
-        )}
+      {/* ── Global Ant Design Dark Overrides ──────────── */}
+      <style>{`
+        /* Reset Ant Design form item labels */
+        .ant-form-item-label > label {
+          color: ${TOKENS.textPrimary} !important;
+          font-family: ${TOKENS.fontFamily} !important;
+          font-size: 14px !important;
+          font-weight: 500 !important;
+        }
+        .ant-form-item-label > label::after {
+          display: none !important;
+        }
 
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, message: 'Please enter your email' }]}
-          >
-            <Input size="large" placeholder="user@domain.com" />
-          </Form.Item>
+        /* Ant Input base overrides */
+        .ant-input,
+        .ant-input-affix-wrapper {
+          background: ${TOKENS.surfaceRecessed} !important;
+          border: none !important;
+          border-radius: ${TOKENS.inputRadius}px !important;
+          color: ${TOKENS.textPrimary} !important;
+          font-family: ${TOKENS.fontFamily} !important;
+          transition: background 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        .ant-input-affix-wrapper {
+          padding: 0 16px !important;
+          height: ${TOKENS.inputHeight}px !important;
+        }
+        .ant-input-affix-wrapper .ant-input {
+          background: transparent !important;
+          height: 100% !important;
+        }
+        .ant-input::placeholder {
+          color: ${TOKENS.placeholderText} !important;
+        }
 
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: 'Please enter your password' }]}
-          >
-            <Input.Password size="large" placeholder="Password" />
-          </Form.Item>
+        /* Password visibility toggle icon */
+        .ant-input-password-icon,
+        .ant-input-suffix .anticon {
+          color: ${TOKENS.textSecondary} !important;
+          transition: color 0.2s ease !important;
+        }
+        .ant-input-password-icon:hover,
+        .ant-input-suffix .anticon:hover {
+          color: ${TOKENS.textPrimary} !important;
+        }
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" size="large" block loading={loading}>
-              Log In
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-    </div>
+        /* Ant focused state - prevent default blue */
+        .ant-input-affix-wrapper-focused,
+        .ant-input-affix-wrapper:focus,
+        .ant-input:focus,
+        .ant-input-focused {
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+
+        /* Button loading spinner */
+        .ant-btn-loading-icon .anticon {
+          color: ${TOKENS.textPrimary} !important;
+        }
+
+        /* Error message styling */
+        .ant-form-item-explain-error {
+          color: #ffb4ab !important;
+          font-family: ${TOKENS.fontFamily} !important;
+          font-size: 12px !important;
+          margin-top: 4px !important;
+        }
+
+        /* Alert overrides for dark mode */
+        .ant-alert-error .ant-alert-message {
+          color: #ffb4ab !important;
+        }
+        .ant-alert-error .ant-alert-icon {
+          color: #ffb4ab !important;
+        }
+        .ant-alert-error .ant-alert-close-icon {
+          color: #ffb4ab !important;
+        }
+      `}</style>
+    </>
   );
 };
 

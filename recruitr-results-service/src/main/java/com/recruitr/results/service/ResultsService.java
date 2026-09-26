@@ -387,9 +387,13 @@ public class ResultsService {
 
     public List<NotificationResponse> getNotifications(
             Long userId) {
-        return notificationRepository
-            .findByUserIdOrderByCreatedAtDesc(userId)
-            .stream()
+        List<Notification> notifications =
+            notificationRepository
+                .findByUserIdOrderByCreatedAtDesc(userId);
+        if (notifications == null || notifications.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return notifications.stream()
             .map(this::mapNotificationToResponse)
             .collect(Collectors.toList());
     }
