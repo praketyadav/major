@@ -2131,143 +2131,322 @@ const ShortlistSection = () => {
   const [selectedDriveId, setSelectedDriveId] = useState(null);
   const [rounds, setRounds] = useState([]);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
-  const [results, setResults] = useState([]);
+  const [activeRound, setActiveRound] = useState(null);
+  const [resultsData, setResultsData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Fetch drives
   const fetchDrives = useCallback(async () => {
     try {
-      const res = await axiosInstance.get('/api/v1/drives');
+      const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch drives');
+      message.error(e.response?.data?.message || 'Failed to fetch drives');
     }
   }, []);
 
-  useEffect(() => { fetchDrives(); }, [fetchDrives]);
+  useEffect(() => {
+    fetchDrives();
+  }, [fetchDrives]);
 
+  // Fetch rounds for selected drive
   const fetchRounds = useCallback(async () => {
-    if (!selectedDriveId) { setRounds([]); return; }
-    try {
-      const res = await axiosInstance.get(`/api/v1/drives/${selectedDriveId}/rounds`);
-      setRounds(res.data || []);
-    } catch (e) {
-      message.error('Failed to fetch rounds');
+    if (!selectedDriveId) {
+      setRounds([]);
+      setSelectedRoundId(null);
+      setActiveRound(null);
+      setResultsData(null);
+      return;
     }
-  }, [selectedDriveId]);
+    try {
+      const res = await driveService.getRoundsForDrive(selectedDriveId);
+      const roundList = res.data || [];
+      setRounds(roundList);
+      if (roundList.length > 0 && !selectedRoundId) {
+        setSelectedRoundId(roundList[0].id);
+        setActiveRound(roundList[0]);
+      }
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
+    }
+  }, [selectedDriveId, selectedRoundId]);
 
-  useEffect(() => { fetchRounds(); }, [fetchRounds]);
+  useEffect(() => {
+    fetchRounds();
+  }, [fetchRounds]);
 
+  // Fetch results for selected round
   const fetchResults = useCallback(async () => {
-    if (!selectedRoundId) { setResults([]); return; }
+    if (!selectedRoundId) {
+      setResultsData(null);
+      return;
+    }
     setLoading(true);
     try {
-      const res = await axiosInstance.get(`/api/v1/results/round/${selectedRoundId}`);
-      const sorted = [...(res.data?.results || [])].sort((a, b) => b.totalScore - a.totalScore);
-      setResults(sorted);
+      const res = await resultsService.getResultsForRound(selectedRoundId);
+      setResultsData(res.data || null);
     } catch (e) {
-      message.error('Failed to fetch results');
+      message.error(e.response?.data?.message || 'Failed to fetch shortlist');
+      setResultsData(null);
     } finally {
       setLoading(false);
     }
   }, [selectedRoundId]);
 
-  useEffect(() => { fetchResults(); }, [fetchResults]);
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults]);
 
   const handleDriveChange = (driveId) => {
     setSelectedDriveId(driveId);
     setSelectedRoundId(null);
-    setResults([]);
+    setActiveRound(null);
+    setResultsData(null);
   };
 
-  const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+  const handleRoundChange = (roundId) => {
+    setSelectedRoundId(roundId);
+    const round = rounds.find((r) => r.id === roundId);
+    setActiveRound(round || null);
+  };
+
+  const selectedDrive = drives.find((d) => d.id === selectedDriveId);
+  const cutoff = activeRound?.cutoffScore ?? 0;
+
+  // Filter strictly for advanced/qualified candidates who met the cutoff
+  const allResults = resultsData?.results || [];
+  const shortlistedCandidates = allResults
+    .filter((r) => (r.totalScore ?? 0) >= cutoff)
+    .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0) || (b.percentile ?? 0) - (a.percentile ?? 0));
+
+  const filteredShortlist = shortlistedCandidates.filter((r) =>
+    !searchQuery ||
+    String(r.studentId).includes(searchQuery) ||
+    String(r.id).includes(searchQuery)
+  );
 
   const columns = [
     {
-      title: 'Rank', key: 'rank', width: 70,
+      title: 'RANK',
+      key: 'rank',
+      width: 80,
       render: (_, __, idx) => (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 32, height: 32, borderRadius: '50%',
-          background: idx < 3 ? `${medalColors[idx]}22` : theme.surfaceHigh,
-          border: idx < 3 ? `2px solid ${medalColors[idx]}` : `1px solid ${theme.border}`,
-          color: idx < 3 ? medalColors[idx] : theme.textMuted,
-          fontWeight: 800, fontSize: 13, fontFamily: theme.font,
-        }}>
-          {idx + 1}
-        </div>
+        <span style={{ color: '#FAFAFA', fontWeight: 700 }}>
+          #{idx + 1}
+        </span>
       ),
     },
     {
-      title: 'Student ID', dataIndex: 'studentId', key: 'studentId', width: 110,
-      render: (v) => <Text style={{ color: theme.textPrimary, fontFamily: 'monospace', fontSize: 12 }}>{v}</Text>,
+      title: 'CANDIDATE ID',
+      dataIndex: 'studentId',
+      key: 'studentId',
+      render: (v) => (
+        <span style={{ color: '#FAFAFA', fontFamily: 'monospace' }}>#STU-{v}</span>
+      ),
     },
     {
-      title: 'MCQ', dataIndex: 'mcqScore', key: 'mcqScore', width: 80,
-      render: (v) => <Text style={{ color: theme.primary, fontWeight: 700 }}>{v}</Text>,
+      title: 'MCQ SCORE',
+      dataIndex: 'mcqScore',
+      key: 'mcqScore',
+      width: 120,
+      render: (v) => <span style={{ color: '#60A5FA' }}>{v ?? 0} pts</span>,
     },
     {
-      title: 'Subjective', dataIndex: 'subjectiveScore', key: 'subjectiveScore', width: 110,
-      render: (v) => <Text style={{ color: theme.warning, fontWeight: 700 }}>{v}</Text>,
+      title: 'SUBJECTIVE',
+      dataIndex: 'subjectiveScore',
+      key: 'subjectiveScore',
+      width: 120,
+      render: (v) => <span style={{ color: '#C084FC' }}>{v ?? 0} pts</span>,
     },
     {
-      title: 'Total', dataIndex: 'totalScore', key: 'totalScore', width: 100,
-      render: (v) => <Text style={{ color: theme.accent, fontWeight: 800, fontSize: 15 }}>{v}</Text>,
+      title: 'TOTAL SCORE',
+      dataIndex: 'totalScore',
+      key: 'totalScore',
+      width: 130,
+      render: (v) => <span style={{ color: '#10B981', fontWeight: 700 }}>{v ?? 0} pts</span>,
     },
     {
-      title: 'Percentile', dataIndex: 'percentile', key: 'percentile', width: 100,
-      render: (v) => <Text style={{ color: theme.textSecondary }}>{v != null ? v : '—'}</Text>,
+      title: 'PERCENTILE',
+      dataIndex: 'percentile',
+      key: 'percentile',
+      width: 120,
+      render: (v) => (
+        <span style={{ color: '#A1A1AA' }}>
+          {v != null ? `${Number(v).toFixed(1)}%` : '—'}
+        </span>
+      ),
+    },
+    {
+      title: 'STATUS',
+      key: 'status',
+      width: 130,
+      render: () => (
+        <span style={{
+          color: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          padding: '3px 10px',
+          borderRadius: 9999,
+          fontSize: 11,
+          fontWeight: 600,
+        }}>
+          ADVANCED
+        </span>
+      ),
     },
   ];
 
   return (
     <>
-      <div style={sectionHeader}>
+      {/* Top Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#A1A1AA' }}>
+          <span style={{ color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BankOutlined style={{ fontSize: 14 }} />
+            Company Console
+          </span>
+          <span style={{ color: '#71717A' }}>›</span>
+          <span style={{ color: '#FAFAFA', fontWeight: 600 }}>Candidate Shortlist</span>
+        </div>
+      </div>
+
+      {/* Hero Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={pageTitle}>
-            <TrophyOutlined style={{ color: '#FFD700', marginRight: 10 }} />
+          <h1 style={{ color: '#FAFAFA', fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <TrophyOutlined style={{ color: '#FFD700' }} />
             Candidate Shortlist
-          </div>
-          <div style={sectionSubtext}>Top-performing candidates ranked by total score</div>
+          </h1>
+          <p style={{ color: '#A1A1AA', fontSize: 13, margin: '4px 0 0 0' }}>
+            Finalized list of top-performing candidates who qualified above the round cutoff score.
+          </p>
         </div>
       </div>
 
-      {/* Selectors */}
-      <div style={{ ...cardStyle, marginBottom: 20, padding: '16px 20px' }}>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.textSecondary, fontWeight: 500, whiteSpace: 'nowrap' }}>Drive:</Text>
-            <Select placeholder="Select Drive" value={selectedDriveId} onChange={handleDriveChange}
-              style={{ width: 280 }} allowClear className="dark-select" popupClassName="dark-dropdown">
-              {drives.map((d) => <Option key={d.id} value={d.id}>{d.id} — {d.title}</Option>)}
+      {/* Cascading Drive & Round Selector Ribbon */}
+      <div style={{
+        borderRadius: 12,
+        backgroundColor: '#121216',
+        border: '1px solid #27272A',
+        padding: '16px 20px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+      }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+              Drive:
+            </span>
+            <Select
+              placeholder="Choose a Drive..."
+              value={selectedDriveId}
+              onChange={handleDriveChange}
+              style={{ minWidth: 260 }}
+              allowClear
+              className="dark-select"
+              popupClassName="dark-dropdown"
+            >
+              {drives.map((d) => (
+                <Option key={d.id} value={d.id}>
+                  {d.title}
+                </Option>
+              ))}
             </Select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.textSecondary, fontWeight: 500, whiteSpace: 'nowrap' }}>Round:</Text>
-            <Select placeholder="Select Round" value={selectedRoundId} onChange={(v) => setSelectedRoundId(v)}
-              style={{ width: 280 }} allowClear disabled={!selectedDriveId}
-              className="dark-select" popupClassName="dark-dropdown">
-              {rounds.map((r) => <Option key={r.id} value={r.id}>{r.roundNumber ?? r.id} — {r.title}</Option>)}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <OrderedListOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+              Round:
+            </span>
+            <Select
+              placeholder="Choose a Round..."
+              value={selectedRoundId}
+              onChange={handleRoundChange}
+              style={{ minWidth: 260 }}
+              allowClear
+              disabled={!selectedDriveId || rounds.length === 0}
+              className="dark-select"
+              popupClassName="dark-dropdown"
+            >
+              {rounds.map((r) => (
+                <Option key={r.id} value={r.id}>
+                  #{r.roundNumber} — {r.title} (Cutoff: {r.cutoffScore ?? 0} pts)
+                </Option>
+              ))}
             </Select>
           </div>
         </div>
+
+        {selectedRoundId && (
+          <Button
+            style={btnGhost}
+            icon={<ReloadOutlined />}
+            onClick={fetchResults}
+            loading={loading}
+          >
+            Refresh
+          </Button>
+        )}
       </div>
 
-      {results.length > 0 ? (
-        <div style={cardStyle}>
-          <Table
-            columns={columns} dataSource={results} rowKey="id" loading={loading}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            size="middle" className="dark-table"
-          />
-        </div>
-      ) : loading ? (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <Spin size="large" />
+      {/* Shortlist Container */}
+      {!selectedDriveId || !selectedRoundId ? (
+        <div style={{
+          borderRadius: 12,
+          backgroundColor: '#121216',
+          border: '1px solid #27272A',
+          padding: '64px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+          }}>
+            <TrophyOutlined style={{ fontSize: 30, color: '#FFD700' }} />
+          </div>
+          <h3 style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 16, margin: 0 }}>
+            Select Drive & Round
+          </h3>
+          <p style={{ color: '#A1A1AA', fontSize: 13, marginTop: 6, marginBottom: 0, maxWidth: 380 }}>
+            Choose a recruitment drive and round above to view ranked shortlisted candidates who cleared the assessment.
+          </p>
         </div>
       ) : (
-        <div style={{ ...glassCard, textAlign: 'center', padding: '48px 24px' }}>
-          <TrophyOutlined style={{ fontSize: 40, color: theme.textMuted, marginBottom: 12 }} />
-          <div style={{ color: theme.textSecondary, fontSize: 15 }}>Select a drive and round to view the shortlist</div>
+        <div style={{
+          borderRadius: 12,
+          backgroundColor: '#121216',
+          border: '1px solid #27272A',
+          overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+        }}>
+          <Table
+            columns={columns}
+            dataSource={filteredShortlist}
+            rowKey="id"
+            loading={loading}
+            pagination={filteredShortlist.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
+            size="middle"
+            className="dark-table"
+          />
         </div>
       )}
     </>
