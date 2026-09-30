@@ -977,7 +977,7 @@ const QuestionBankSection = () => {
             <Input className="dark-input" placeholder="e.g. Algorithms, Data Structures, Java" />
           </Form.Item>
 
-          {/* Question Bank dynamic fields */}
+          {/* Dynamic MCQ Options & Correct Answer Designation */}
           {questionType === 'MCQ' && (
             <div style={{
               background: '#121216',
