@@ -1355,8 +1355,9 @@ const ResultsSection = () => {
   const [resultsData, setResultsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewResultId, setReviewResultId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
+  const [reviewResult, setReviewResult] = useState(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewForm] = Form.useForm();
 
   // 1. Fetch drives
@@ -1434,29 +1435,36 @@ const ResultsSection = () => {
     setActiveRound(round || null);
   };
 
-  const openReviewModal = (resultId) => {
-    setReviewResultId(resultId);
+  // Subjective Review Modal Handlers
+  const openReviewModal = (record) => {
+    setReviewResult(record);
     reviewForm.resetFields();
+    reviewForm.setFieldsValue({
+      questionId: 1,
+      marksAwarded: record.subjectiveScore || 0,
+    });
     setReviewModalOpen(true);
   };
 
-  const handleReview = async (values) => {
-    setSubmitting(true);
+  const handleReviewSubmit = async (values) => {
+    if (!reviewResult) return;
+    setSubmittingReview(true);
     try {
-      const userId = localStorage.getItem('userId');
-      await axiosInstance.post(`/api/v1/results/${reviewResultId}/subjective-review`, {
-        questionId: values.questionId,
-        marksAwarded: values.marksAwarded,
-        reviewedBy: userId,
+      const reviewerId = user?.id || localStorage.getItem('userId') || 1;
+      await resultsService.submitSubjectiveReview(reviewResult.id, {
+        questionId: Number(values.questionId),
+        marksAwarded: Number(values.marksAwarded),
+        reviewedBy: Number(reviewerId),
       });
-      message.success('Review submitted');
-      reviewForm.resetFields();
+      message.success('Subjective score recorded successfully');
       setReviewModalOpen(false);
+      setReviewResult(null);
+      reviewForm.resetFields();
       fetchResults();
     } catch (e) {
-      message.error('Failed to submit review');
+      message.error(e.response?.data?.message || 'Failed to submit subjective review');
     } finally {
-      setSubmitting(false);
+      setSubmittingReview(false);
     }
   };
 
@@ -1691,7 +1699,7 @@ const ResultsSection = () => {
           size="small"
           style={record.subjectiveReviewed ? btnGhost : btnPrimary}
           icon={<EditOutlined />}
-          onClick={() => openReviewModal(record.id)}
+          onClick={() => openReviewModal(record)}
         >
           {record.subjectiveReviewed ? 'Re-Grade' : 'Review'}
         </Button>
@@ -1964,24 +1972,90 @@ const ResultsSection = () => {
         </div>
       )}
 
-      {/* Review Subjective Modal */}
+      {/* ── Modal: Review Subjective Answer ─────────────────────── */}
       <Modal
-        title={<span style={{ color: theme.textPrimary, fontWeight: 700, fontSize: 18 }}>Review Subjective Answer</span>}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <EditOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 700, fontSize: 16 }}>
+              Subjective Question Evaluation
+            </span>
+          </div>
+        }
         open={reviewModalOpen}
-        onCancel={() => { reviewForm.resetFields(); setReviewModalOpen(false); }}
-        footer={null} destroyOnClose width={480}
-        styles={{ header: { background: theme.surface, borderBottom: `1px solid ${theme.border}` }, body: { background: theme.surface }, content: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radiusLg } }}
+        onCancel={() => {
+          reviewForm.resetFields();
+          setReviewModalOpen(false);
+          setReviewResult(null);
+        }}
+        footer={null}
+        destroyOnClose
+        width={460}
+        styles={{
+          header: { background: '#121216', borderBottom: '1px solid #27272A', padding: '16px 24px' },
+          body: { background: '#121216', padding: '20px 24px' },
+          content: { background: '#121216', border: '1px solid #27272A', borderRadius: 12, overflow: 'hidden' },
+        }}
       >
-        <Form form={reviewForm} layout="vertical" onFinish={handleReview} className="dark-form">
-          <Form.Item name="questionId" label={<span style={{ color: theme.textSecondary }}>Question ID</span>} rules={[{ required: true, message: 'Required' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} className="dark-input" />
+        {reviewResult && (
+          <div style={{
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 20,
+            fontSize: 13,
+            color: '#A1A1AA',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <span>Student: <strong style={{ color: '#FAFAFA' }}>#STU-{reviewResult.studentId}</strong></span>
+            <span>MCQ Score: <strong style={{ color: '#60A5FA' }}>{reviewResult.mcqScore ?? 0} pts</strong></span>
+          </div>
+        )}
+
+        <Form
+          form={reviewForm}
+          layout="vertical"
+          onFinish={handleReviewSubmit}
+          className="dark-form"
+        >
+          <Form.Item
+            name="questionId"
+            label="Subjective Question ID"
+            rules={[{ required: true, message: 'Question ID is required' }]}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              className="dark-input"
+              placeholder="e.g. 1"
+            />
           </Form.Item>
-          <Form.Item name="marksAwarded" label={<span style={{ color: theme.textSecondary }}>Marks Awarded</span>} rules={[{ required: true, message: 'Required' }]}>
-            <InputNumber min={0} style={{ width: '100%' }} className="dark-input" />
+
+          <Form.Item
+            name="marksAwarded"
+            label="Marks Awarded"
+            rules={[{ required: true, message: 'Marks awarded is required' }]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              step={0.5}
+              style={{ width: '100%' }}
+              className="dark-input"
+              placeholder="e.g. 8.5"
+            />
           </Form.Item>
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Button style={{ ...btnPrimary, width: '100%', height: 42 }} htmlType="submit" loading={submitting}>
-              Submit Review
+
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Button
+              style={{ ...btnPrimary, width: '100%', height: 42, justifyContent: 'center' }}
+              htmlType="submit"
+              loading={submittingReview}
+            >
+              Submit Evaluation Score
             </Button>
           </Form.Item>
         </Form>
