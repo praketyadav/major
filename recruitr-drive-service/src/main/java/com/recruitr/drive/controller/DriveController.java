@@ -28,7 +28,7 @@ public class DriveController {
                     request, Long.parseLong(userId), role));
     }
 
-    @GetMapping("/drives")
+    @GetMapping({"/drives", "/drives/company"})
     public ResponseEntity<List<DriveResponse>> getDrives(
             @RequestHeader("X-User-Id") String userId,
             @RequestHeader("X-User-Role") String role) {

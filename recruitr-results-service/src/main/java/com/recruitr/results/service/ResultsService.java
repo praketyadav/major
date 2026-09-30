@@ -225,7 +225,8 @@ public class ResultsService {
     public RoundResultSummary advanceStudents(
             Long roundId, AdvanceRoundRequest request,
             String callerRole) {
-        if (!"COMPANY_ADMIN".equals(callerRole)) {
+        if (!"COMPANY_ADMIN".equals(callerRole)
+                && !"SUPER_ADMIN".equals(callerRole)) {
             throw new AccessDeniedException(
                 "Only Company Admin can advance students");
         }
@@ -236,8 +237,56 @@ public class ResultsService {
                 "No results found for round: " + roundId);
         }
 
-        double cutoff = request.getCutoffScore() != null
-            ? request.getCutoffScore() : 0.0;
+        // 1. Secure Cutoff Enforcement: Fetch Round details from Drive Service
+        Map<?, ?> currentRoundData = null;
+        try {
+            currentRoundData = restTemplate.getForObject(
+                driveUrl + "/api/v1/drives/0/rounds/" + roundId,
+                Map.class);
+        } catch (Exception e) {
+            throw new ResourceNotFoundException(
+                "Could not retrieve round details from drive service: " + e.getMessage());
+        }
+
+        if (currentRoundData == null) {
+            throw new ResourceNotFoundException("Round not found with id: " + roundId);
+        }
+
+        double cutoff = currentRoundData.get("cutoffScore") != null
+            ? ((Number) currentRoundData.get("cutoffScore")).doubleValue()
+            : 0.0;
+
+        Long driveId = currentRoundData.get("driveId") != null
+            ? ((Number) currentRoundData.get("driveId")).longValue()
+            : null;
+
+        int currentRoundNumber = currentRoundData.get("roundNumber") != null
+            ? ((Number) currentRoundData.get("roundNumber")).intValue()
+            : 1;
+
+        // 2. Query recruitr-drive-service to find if a subsequent round exists
+        Long nextRoundId = null;
+        Integer nextRoundNumber = null;
+        if (driveId != null) {
+            try {
+                List<?> allRounds = restTemplate.getForObject(
+                    driveUrl + "/api/v1/drives/" + driveId + "/rounds",
+                    List.class);
+                if (allRounds != null) {
+                    for (Object rObj : allRounds) {
+                        Map<?, ?> roundMap = (Map<?, ?>) rObj;
+                        if (roundMap.get("roundNumber") != null
+                                && ((Number) roundMap.get("roundNumber")).intValue() == currentRoundNumber + 1) {
+                            nextRoundId = ((Number) roundMap.get("id")).longValue();
+                            nextRoundNumber = currentRoundNumber + 1;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Warning: Could not fetch subsequent rounds for drive " + driveId + ": " + e.getMessage());
+            }
+        }
 
         int totalAttempted = results.size();
         int advanced = 0;
@@ -255,7 +304,10 @@ public class ResultsService {
             r.setPercentile(percentile);
             resultRepository.save(r);
 
-            // Find enrollment and update status
+            boolean isQualified = r.getTotalScore() >= cutoff;
+            String newStatus = isQualified ? "ADVANCED" : "ELIMINATED";
+
+            // Find current enrollment and update status
             try {
                 List<?> enrollments = restTemplate.getForObject(
                     enrollmentUrl
@@ -275,16 +327,13 @@ public class ResultsService {
                                 ((Number) enrollment.get("id"))
                                     .longValue();
 
-                            String newStatus =
-                                r.getTotalScore() >= cutoff
-                                    ? "ADVANCED" : "ELIMINATED";
-
                             Map<String, String> statusBody =
                                 Map.of("status", newStatus);
                             HttpHeaders headers =
                                 new HttpHeaders();
                             headers.setContentType(
                                 MediaType.APPLICATION_JSON);
+                            headers.set("X-User-Role", callerRole);
                             HttpEntity<Map<String, String>>
                                 entity = new HttpEntity<>(
                                     statusBody, headers);
@@ -295,40 +344,69 @@ public class ResultsService {
                                     + enrollmentId + "/status",
                                 HttpMethod.PATCH,
                                 entity, Map.class);
-
-                            if ("ADVANCED".equals(newStatus)) {
-                                advanced++;
-                                createNotification(
-                                    r.getStudentId(),
-                                    "Round Result",
-                                    "Congratulations! You have "
-                                        + "advanced to the next "
-                                        + "round. Score: "
-                                        + r.getTotalScore()
-                                        + ", Percentile: "
-                                        + String.format("%.1f",
-                                            percentile) + "%");
-                            } else {
-                                eliminated++;
-                                createNotification(
-                                    r.getStudentId(),
-                                    "Round Result",
-                                    "Thank you for attempting "
-                                        + "the assessment. "
-                                        + "You have not advanced "
-                                        + "to the next round. "
-                                        + "Score: "
-                                        + r.getTotalScore());
-                            }
                             break;
                         }
                     }
                 }
             } catch (Exception e) {
                 System.err.println(
-                    "Warning: Could not update enrollment "
-                        + "for student " + r.getStudentId()
-                        + ": " + e.getMessage());
+                    "Warning: Could not update enrollment status for student "
+                        + r.getStudentId() + ": " + e.getMessage());
+            }
+
+            if (isQualified) {
+                advanced++;
+
+                // Auto-rollover to Next Round if it exists
+                if (nextRoundId != null && driveId != null) {
+                    try {
+                        Map<String, Object> enrollBody = Map.of(
+                            "studentId", r.getStudentId(),
+                            "driveId", driveId,
+                            "roundId", nextRoundId
+                        );
+                        HttpHeaders headers = new HttpHeaders();
+                        headers.setContentType(MediaType.APPLICATION_JSON);
+                        headers.set("X-User-Role", callerRole);
+                        headers.set("X-User-Id", "1");
+                        HttpEntity<Map<String, Object>> enrollEntity =
+                            new HttpEntity<>(enrollBody, headers);
+
+                        restTemplate.postForObject(
+                            enrollmentUrl + "/api/v1/enrollment/drive/" + driveId + "/students",
+                            enrollEntity,
+                            Map.class);
+                    } catch (Exception e) {
+                        System.err.println(
+                            "Warning: Could not auto-enroll student " + r.getStudentId()
+                                + " into next round " + nextRoundId + ": " + e.getMessage());
+                    }
+
+                    createNotification(
+                        r.getStudentId(),
+                        "Round Result & Advancement",
+                        "Congratulations! You met the cutoff of " + cutoff
+                            + " and advanced to Round " + (nextRoundNumber != null ? nextRoundNumber : "")
+                            + ". Score: " + r.getTotalScore()
+                            + ", Percentile: " + String.format("%.1f", percentile) + "%");
+                } else {
+                    // Final round cleared
+                    createNotification(
+                        r.getStudentId(),
+                        "Final Round Result",
+                        "Congratulations! You met the cutoff of " + cutoff
+                            + " and cleared the final round of the drive! Score: "
+                            + r.getTotalScore()
+                            + ", Percentile: " + String.format("%.1f", percentile) + "%");
+                }
+            } else {
+                eliminated++;
+                createNotification(
+                    r.getStudentId(),
+                    "Round Result",
+                    "Thank you for attempting the assessment. You did not meet the cutoff score of "
+                        + cutoff + " for this round. Score: "
+                        + r.getTotalScore());
             }
         }
 

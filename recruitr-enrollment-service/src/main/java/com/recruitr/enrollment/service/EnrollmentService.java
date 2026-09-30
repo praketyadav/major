@@ -64,16 +64,20 @@ public class EnrollmentService {
     public EnrollmentResponse enrollStudent(
             EnrollStudentRequest request, String callerRole) {
         if (!"COLLEGE_ADMIN".equals(callerRole)
-                && !"SUPER_ADMIN".equals(callerRole)) {
+                && !"SUPER_ADMIN".equals(callerRole)
+                && !"COMPANY_ADMIN".equals(callerRole)) {
             throw new AccessDeniedException(
-                "Only College Admin can enroll students");
+                "Only authorized administrators can enroll students");
         }
         if (studentEnrollmentRepository
                 .existsByStudentIdAndRoundId(
                     request.getStudentId(),
                     request.getRoundId())) {
-            throw new BadRequestException(
-                "Student is already enrolled in this round");
+            return mapToResponse(
+                studentEnrollmentRepository
+                    .findByStudentIdAndRoundId(
+                        request.getStudentId(),
+                        request.getRoundId()).get());
         }
         StudentEnrollment enrollment = new StudentEnrollment();
         enrollment.setStudentId(request.getStudentId());
