@@ -2226,23 +2226,70 @@ const ShortlistSection = () => {
     String(r.id).includes(searchQuery)
   );
 
+  // Dynamic statistics
+  const totalShortlisted = shortlistedCandidates.length;
+  const highestScore = shortlistedCandidates.length > 0
+    ? Math.max(...shortlistedCandidates.map((r) => r.totalScore ?? 0))
+    : 0;
+  const avgShortlistScore = shortlistedCandidates.length > 0
+    ? (shortlistedCandidates.reduce((acc, r) => acc + (r.totalScore ?? 0), 0) / shortlistedCandidates.length).toFixed(1)
+    : '0.0';
+
+  const medalColors = ['#FFD700', '#E2E8F0', '#CD7F32'];
+
   const columns = [
     {
       title: 'RANK',
       key: 'rank',
       width: 80,
-      render: (_, __, idx) => (
-        <span style={{ color: '#FAFAFA', fontWeight: 700 }}>
-          #{idx + 1}
-        </span>
-      ),
+      render: (_, __, idx) => {
+        const isTop3 = idx < 3;
+        return (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: isTop3 ? `${medalColors[idx]}20` : '#18181B',
+            border: isTop3 ? `1.5px solid ${medalColors[idx]}` : '1px solid #27272A',
+            color: isTop3 ? medalColors[idx] : '#A1A1AA',
+            fontWeight: 800,
+            fontSize: 13,
+          }}>
+            #{idx + 1}
+          </div>
+        );
+      },
     },
     {
       title: 'CANDIDATE ID',
       dataIndex: 'studentId',
       key: 'studentId',
       render: (v) => (
-        <span style={{ color: '#FAFAFA', fontFamily: 'monospace' }}>#STU-{v}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#3B82F6',
+            fontSize: 12,
+            fontWeight: 700,
+          }}>
+            <TeamOutlined />
+          </div>
+          <div>
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontFamily: 'monospace', fontSize: 13 }}>
+              #STU-{v}
+            </span>
+          </div>
+        </div>
       ),
     },
     {
@@ -2250,21 +2297,63 @@ const ShortlistSection = () => {
       dataIndex: 'mcqScore',
       key: 'mcqScore',
       width: 120,
-      render: (v) => <span style={{ color: '#60A5FA' }}>{v ?? 0} pts</span>,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          color: '#60A5FA',
+          padding: '2px 8px',
+          borderRadius: 6,
+          fontWeight: 600,
+          fontSize: 12,
+        }}>
+          {v ?? 0} pts
+        </span>
+      ),
     },
     {
       title: 'SUBJECTIVE',
       dataIndex: 'subjectiveScore',
       key: 'subjectiveScore',
       width: 120,
-      render: (v) => <span style={{ color: '#C084FC' }}>{v ?? 0} pts</span>,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(168, 85, 247, 0.1)',
+          border: '1px solid rgba(168, 85, 247, 0.25)',
+          color: '#C084FC',
+          padding: '2px 8px',
+          borderRadius: 6,
+          fontWeight: 600,
+          fontSize: 12,
+        }}>
+          {v ?? 0} pts
+        </span>
+      ),
     },
     {
       title: 'TOTAL SCORE',
       dataIndex: 'totalScore',
       key: 'totalScore',
       width: 130,
-      render: (v) => <span style={{ color: '#10B981', fontWeight: 700 }}>{v ?? 0} pts</span>,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid rgba(16, 185, 129, 0.35)',
+          color: '#10B981',
+          padding: '3px 10px',
+          borderRadius: 6,
+          fontWeight: 800,
+          fontSize: 14,
+        }}>
+          {v ?? 0} pts
+        </span>
+      ),
     },
     {
       title: 'PERCENTILE',
@@ -2272,7 +2361,7 @@ const ShortlistSection = () => {
       key: 'percentile',
       width: 120,
       render: (v) => (
-        <span style={{ color: '#A1A1AA' }}>
+        <span style={{ color: '#A1A1AA', fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>
           {v != null ? `${Number(v).toFixed(1)}%` : '—'}
         </span>
       ),
@@ -2290,7 +2379,18 @@ const ShortlistSection = () => {
           borderRadius: 9999,
           fontSize: 11,
           fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
         }}>
+          <span style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            backgroundColor: '#10B981',
+          }} />
           ADVANCED
         </span>
       ),
@@ -2431,23 +2531,150 @@ const ShortlistSection = () => {
           </p>
         </div>
       ) : (
-        <div style={{
-          borderRadius: 12,
-          backgroundColor: '#121216',
-          border: '1px solid #27272A',
-          overflow: 'hidden',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-        }}>
-          <Table
-            columns={columns}
-            dataSource={filteredShortlist}
-            rowKey="id"
-            loading={loading}
-            pagination={filteredShortlist.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
-            size="middle"
-            className="dark-table"
-          />
-        </div>
+        <>
+          {/* Dynamic 4-Metric Statistics Ribbon */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {/* Metric 1: Shortlisted Total */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  SHORTLISTED CANDIDATES
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(255, 215, 0, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFD700' }}>
+                  <TrophyOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#FFD700', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {totalShortlisted}
+                </span>
+                <span style={{ fontSize: 11, color: '#FFD700', fontWeight: 600 }}>Qualified</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 2: Passing Cutoff */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  ROUND CUTOFF SCORE
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F59E0B' }}>
+                  <OrderedListOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#F59E0B', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {cutoff}
+                </span>
+                <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>Points Baseline</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 3: Highest Score */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  TOP SCORE ACHIEVED
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <CheckCircleOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#10B981', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {highestScore}
+                </span>
+                <span style={{ fontSize: 11, color: '#71717A', fontFamily: 'monospace' }}>pts (Rank #1)</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 4: Average Score */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  SHORTLIST MEAN SCORE
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                  <BarChartOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#60A5FA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {avgShortlistScore}
+                </span>
+                <span style={{ fontSize: 11, color: '#71717A', fontFamily: 'monospace' }}>pts Average</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.4), transparent)' }} />
+            </div>
+          </div>
+
+          {/* Search Filter */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <Input
+              placeholder="Search shortlisted candidates by ID..."
+              prefix={<SearchOutlined style={{ color: '#71717A', marginRight: 6 }} />}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: 280,
+                backgroundColor: '#121216',
+                border: '1px solid #27272A',
+                color: '#FAFAFA',
+                borderRadius: 8,
+                height: 38,
+              }}
+            />
+          </div>
+
+          {/* Shortlist Data Table */}
+          <div style={{
+            borderRadius: 12,
+            backgroundColor: '#121216',
+            border: '1px solid #27272A',
+            overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}>
+            <Table
+              columns={columns}
+              dataSource={filteredShortlist}
+              rowKey="id"
+              loading={loading}
+              pagination={filteredShortlist.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
+              size="middle"
+              className="dark-table"
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+                    <TrophyOutlined style={{ fontSize: 32, color: '#71717A', marginBottom: 8 }} />
+                    <div style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 14 }}>No Candidates Shortlisted Yet</div>
+                    <div style={{ color: '#A1A1AA', fontSize: 12, marginTop: 4 }}>
+                      No candidates currently meet or exceed the cutoff score of {cutoff} pts for this round.
+                    </div>
+                  </div>
+                ),
+              }}
+            />
+          </div>
+        </>
       )}
     </>
   );
