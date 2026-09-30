@@ -13,6 +13,7 @@ import {
   SettingOutlined, FileTextOutlined, TeamOutlined,
   SearchOutlined, ReloadOutlined, BellOutlined,
   AppstoreOutlined, EditOutlined, InboxOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../auth/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
@@ -1048,296 +1049,876 @@ const RoundsSection = ({ initialDriveId }) => {
   const [loading, setLoading] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [assignRoundId, setAssignRoundId] = useState(null);
+  const [activeRound, setActiveRound] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [questionFilter, setQuestionFilter] = useState('');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState('ALL');
   const [submitting, setSubmitting] = useState(false);
+  const [assignLoading, setAssignLoading] = useState(false);
   const [form] = Form.useForm();
 
+  // Fetch all company drives
   const fetchDrives = useCallback(async () => {
     try {
-      const res = await axiosInstance.get('/api/v1/drives');
+      const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch drives');
+      message.error(e.response?.data?.message || 'Failed to fetch drives');
     }
   }, []);
 
-  useEffect(() => { fetchDrives(); }, [fetchDrives]);
+  useEffect(() => {
+    fetchDrives();
+  }, [fetchDrives]);
 
   useEffect(() => {
-    if (initialDriveId) setSelectedDriveId(initialDriveId);
+    if (initialDriveId) {
+      setSelectedDriveId(initialDriveId);
+    }
   }, [initialDriveId]);
 
+  // Fetch rounds for the currently selected drive
   const fetchRounds = useCallback(async () => {
-    if (!selectedDriveId) return;
+    if (!selectedDriveId) {
+      setRounds([]);
+      return;
+    }
     setLoading(true);
     try {
-      const res = await axiosInstance.get(`/api/v1/drives/${selectedDriveId}/rounds`);
+      const res = await driveService.getRoundsForDrive(selectedDriveId);
       setRounds(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch rounds');
+      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
     } finally {
       setLoading(false);
     }
   }, [selectedDriveId]);
 
-  useEffect(() => { fetchRounds(); }, [fetchRounds]);
+  useEffect(() => {
+    fetchRounds();
+  }, [fetchRounds]);
 
+  // Handle adding a new round
   const handleAddRound = async (values) => {
-    setSubmitting(true);
-    try {
-      await axiosInstance.post(`/api/v1/drives/${selectedDriveId}/rounds`, {
-        title: values.title,
-        durationMinutes: values.durationMinutes,
-        cutoffScore: values.cutoffScore,
-      });
-      message.success('Round added');
-      form.resetFields();
-      setAddModalOpen(false);
-      fetchRounds();
-    } catch (e) {
-      message.error('Failed to add round');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const activateRound = async (roundId) => {
-    try {
-      await axiosInstance.patch(`/api/v1/drives/${selectedDriveId}/rounds/${roundId}/activate`);
-      message.success('Round activated');
-      fetchRounds();
-    } catch (e) {
-      message.error('Failed to activate round');
-    }
-  };
-
-  const openAssignModal = async (roundId) => {
-    setAssignRoundId(roundId);
-    try {
-      const res = await axiosInstance.get('/api/v1/questions');
-      setQuestions(res.data || []);
-    } catch (e) {
-      message.error('Failed to fetch questions');
-    }
-    setSelectedQuestionIds([]);
-    setAssignModalOpen(true);
-  };
-
-  const handleAssign = async () => {
-    if (selectedQuestionIds.length === 0) {
-      message.warning('Select at least one question');
+    if (!selectedDriveId) {
+      message.warning('Please select a drive first');
       return;
     }
     setSubmitting(true);
     try {
-      await axiosInstance.post(
-        `/api/v1/drives/${selectedDriveId}/rounds/${assignRoundId}/questions`,
-        { questionIds: selectedQuestionIds },
-      );
-      message.success('Questions assigned');
-      setAssignModalOpen(false);
-      setSelectedQuestionIds([]);
+      const payload = {
+        title: values.title?.trim() || `Round ${rounds.length + 1}`,
+        durationMinutes: Number(values.durationMinutes),
+        cutoffScore: Number(values.cutoffScore),
+      };
+      await driveService.addRound(selectedDriveId, payload);
+      message.success('Assessment round created successfully');
+      form.resetFields();
+      setAddModalOpen(false);
+      fetchRounds();
     } catch (e) {
-      message.error('Failed to assign questions');
+      message.error(e.response?.data?.message || 'Failed to create round');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const roundStatusTag = (s) => {
+  // Handle activating a round
+  const handleActivateRound = async (roundId) => {
+    try {
+      await driveService.activateRound(selectedDriveId, roundId);
+      message.success('Round activated successfully');
+      fetchRounds();
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to activate round');
+    }
+  };
+
+  // Open the "Assign Questions" interface for a round
+  const openAssignModal = async (round) => {
+    setActiveRound(round);
+    setAssignModalOpen(true);
+    setAssignLoading(true);
+    setQuestionFilter('');
+    setQuestionTypeFilter('ALL');
+
+    try {
+      // 1. Fetch global Question Bank
+      const qRes = await questionService.getQuestions();
+      const allQuestions = qRes.data || [];
+      setQuestions(allQuestions);
+
+      // 2. Fetch already-assigned questions for this round
+      try {
+        const assignedRes = await driveService.getQuestionsForRound(selectedDriveId, round.id);
+        const assignedData = assignedRes.data || [];
+        const assignedIds = Array.isArray(assignedData)
+          ? assignedData.map((q) => (typeof q === 'object' ? q.id : q))
+          : [];
+        setSelectedQuestionIds(assignedIds);
+      } catch (err) {
+        // If no questions assigned yet or endpoint returns 404/empty, initialize empty
+        setSelectedQuestionIds([]);
+      }
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to load question bank');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // Save assigned questions
+  const handleSaveQuestions = async () => {
+    if (!selectedDriveId || !activeRound) return;
+    setSubmitting(true);
+    try {
+      await driveService.assignQuestionsToRound(
+        selectedDriveId,
+        activeRound.id,
+        selectedQuestionIds,
+      );
+      message.success(`Assigned ${selectedQuestionIds.length} question(s) to Round #${activeRound.roundNumber}`);
+      setAssignModalOpen(false);
+      setActiveRound(null);
+      setSelectedQuestionIds([]);
+      fetchRounds();
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to assign questions to round');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedDrive = drives.find((d) => d.id === selectedDriveId);
+
+  const roundStatusTag = (status) => {
     const map = {
-      ACTIVE:      { color: theme.accent, bg: theme.accentGlow },
-      NOT_STARTED: { color: theme.textMuted, bg: theme.surfaceHigh },
-      COMPLETED:   { color: theme.danger, bg: theme.dangerGlow },
+      ACTIVE: {
+        color: '#10B981',
+        bg: 'rgba(16, 185, 129, 0.12)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        label: 'ACTIVE',
+      },
+      NOT_STARTED: {
+        color: '#A1A1AA',
+        bg: '#18181B',
+        border: '1px solid #27272A',
+        label: 'NOT STARTED',
+      },
+      COMPLETED: {
+        color: '#EF4444',
+        bg: 'rgba(239, 68, 68, 0.12)',
+        border: '1px solid rgba(239, 68, 68, 0.25)',
+        label: 'COMPLETED',
+      },
     };
-    const cfg = map[s] || map.NOT_STARTED;
+    const cfg = map[status] || map.NOT_STARTED;
     return (
       <span style={{
-        color: cfg.color, background: cfg.bg, padding: '3px 10px',
-        borderRadius: 20, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em',
+        color: cfg.color,
+        backgroundColor: cfg.bg,
+        border: cfg.border,
+        padding: '3px 10px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
       }}>
-        {s}
+        <span style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          backgroundColor: cfg.color,
+        }} />
+        {cfg.label}
       </span>
     );
   };
 
   const columns = [
     {
-      title: 'Round', dataIndex: 'roundNumber', key: 'roundNumber', width: 80,
-      render: (v) => <Text style={{ color: theme.primary, fontWeight: 800, fontSize: 16 }}>#{v}</Text>,
+      title: 'ROUND',
+      dataIndex: 'roundNumber',
+      key: 'roundNumber',
+      width: 90,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: '#18181B',
+          border: '1px solid #27272A',
+          color: '#3B82F6',
+          fontWeight: 800,
+          fontSize: 13,
+        }}>
+          #{v}
+        </span>
+      ),
     },
     {
-      title: 'Title', dataIndex: 'title', key: 'title',
-      render: (t) => <Text strong style={{ color: theme.textPrimary }}>{t}</Text>,
+      title: 'TITLE',
+      dataIndex: 'title',
+      key: 'title',
+      render: (t, record) => (
+        <div>
+          <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 14 }}>
+            {t || `Round ${record.roundNumber}`}
+          </span>
+          <div style={{ color: '#71717A', fontSize: 11, marginTop: 2 }}>
+            Sequence #{record.roundNumber} in assessment pipeline
+          </div>
+        </div>
+      ),
     },
     {
-      title: 'Duration', dataIndex: 'durationMinutes', key: 'durationMinutes', width: 120,
-      render: (v) => <Text style={{ color: theme.textSecondary }}>{v} min</Text>,
-    },
-    {
-      title: 'Cutoff', dataIndex: 'cutoffScore', key: 'cutoffScore', width: 100,
-      render: (v) => <Text style={{ color: theme.warning, fontWeight: 600 }}>{v}</Text>,
-    },
-    {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 140,
+      title: 'STATUS',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
       render: (s) => roundStatusTag(s),
     },
     {
-      title: 'Actions', key: 'actions', width: 280,
+      title: 'CUTOFF SCORE',
+      dataIndex: 'cutoffScore',
+      key: 'cutoffScore',
+      width: 140,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          color: '#F59E0B',
+          borderRadius: 6,
+          padding: '2px 8px',
+          fontWeight: 600,
+          fontSize: 12,
+        }}>
+          {v ?? 0} pts
+        </span>
+      ),
+    },
+    {
+      title: 'DURATION',
+      dataIndex: 'durationMinutes',
+      key: 'durationMinutes',
+      width: 130,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: '#18181B',
+          border: '1px solid #27272A',
+          color: '#A1A1AA',
+          borderRadius: 6,
+          padding: '2px 8px',
+          fontWeight: 500,
+          fontSize: 12,
+        }}>
+          {v} min
+        </span>
+      ),
+    },
+    {
+      title: 'ACTIONS',
+      key: 'actions',
+      width: 250,
+      align: 'right',
       render: (_, record) => (
-        <Space size={6}>
+        <Space size={8}>
           {record.status === 'NOT_STARTED' && (
-            <Button size="small" style={btnPrimary} icon={<CheckCircleOutlined />}
-              onClick={() => activateRound(record.id)}>Activate</Button>
+            <Button
+              size="small"
+              style={{ ...btnPrimary, height: 30, padding: '0 10px', fontSize: 12 }}
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleActivateRound(record.id)}
+            >
+              Activate
+            </Button>
           )}
-          <Button size="small" style={btnGhost} icon={<FileTextOutlined />}
-            onClick={() => openAssignModal(record.id)}>Assign Qs</Button>
+          <Button
+            size="small"
+            style={{ ...btnGhost, height: 30, padding: '0 10px', fontSize: 12 }}
+            icon={<FileTextOutlined />}
+            onClick={() => openAssignModal(record)}
+          >
+            Manage Questions
+          </Button>
         </Space>
       ),
     },
   ];
 
+  // Filtered questions in Assign Modal
+  const filteredQuestions = questions.filter((q) => {
+    const matchesType =
+      questionTypeFilter === 'ALL' || q.questionType === questionTypeFilter;
+    const matchesText =
+      !questionFilter ||
+      q.questionText?.toLowerCase().includes(questionFilter.toLowerCase()) ||
+      q.tags?.toLowerCase().includes(questionFilter.toLowerCase()) ||
+      String(q.id).includes(questionFilter);
+    return matchesType && matchesText;
+  });
+
+  // Calculate stats for selected questions
+  const totalSelectedMarks = questions
+    .filter((q) => selectedQuestionIds.includes(q.id))
+    .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+  const assignTableColumns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 70,
+      render: (v) => (
+        <span style={{ fontFamily: 'monospace', color: '#71717A', fontSize: 12 }}>
+          #{v}
+        </span>
+      ),
+    },
+    {
+      title: 'TYPE',
+      dataIndex: 'questionType',
+      key: 'questionType',
+      width: 110,
+      render: (t) => {
+        const isMCQ = t === 'MCQ';
+        return (
+          <span style={{
+            color: isMCQ ? '#60A5FA' : '#C084FC',
+            backgroundColor: isMCQ ? 'rgba(59, 130, 246, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+            border: `1px solid ${isMCQ ? 'rgba(59, 130, 246, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
+            padding: '2px 8px',
+            borderRadius: 9999,
+            fontSize: 10,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            {isMCQ ? 'MCQ' : 'Subjective'}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'QUESTION TEXT',
+      dataIndex: 'questionText',
+      key: 'questionText',
+      render: (text) => (
+        <span style={{ color: '#FAFAFA', fontSize: 13 }}>
+          {text && text.length > 85 ? `${text.slice(0, 85)}…` : text}
+        </span>
+      ),
+    },
+    {
+      title: 'MARKS',
+      dataIndex: 'marks',
+      key: 'marks',
+      width: 90,
+      render: (m) => (
+        <span style={{
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          color: '#10B981',
+          padding: '2px 6px',
+          borderRadius: 4,
+          fontSize: 11,
+          fontWeight: 600,
+        }}>
+          {m} pts
+        </span>
+      ),
+    },
+    {
+      title: 'TAGS',
+      dataIndex: 'tags',
+      key: 'tags',
+      width: 140,
+      render: (tags) => {
+        if (!tags) return <span style={{ color: '#52525B', fontSize: 12 }}>—</span>;
+        const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {tagList.slice(0, 2).map((t, idx) => (
+              <span key={idx} style={{
+                backgroundColor: '#18181B',
+                border: '1px solid #27272A',
+                color: '#A1A1AA',
+                padding: '1px 6px',
+                borderRadius: 4,
+                fontSize: 10,
+              }}>
+                {t}
+              </span>
+            ))}
+            {tagList.length > 2 && (
+              <span style={{ color: '#71717A', fontSize: 10 }}>+{tagList.length - 2}</span>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <>
-      <div style={sectionHeader}>
+      {/* Top Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#A1A1AA' }}>
+          <span style={{ color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BankOutlined style={{ fontSize: 14 }} />
+            Company Console
+          </span>
+          <span style={{ color: '#71717A' }}>›</span>
+          <span style={{ color: '#FAFAFA', fontWeight: 600 }}>Rounds Management</span>
+        </div>
+      </div>
+
+      {/* Hero Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={pageTitle}>Rounds Management</div>
-          <div style={sectionSubtext}>Configure and assign questions to drive rounds</div>
+          <h1 style={{ color: '#FAFAFA', fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
+            Rounds Management
+          </h1>
+          <p style={{ color: '#A1A1AA', fontSize: 13, margin: '4px 0 0 0' }}>
+            Configure assessment stages, define passing cutoffs, and bridge questions from your Question Bank.
+          </p>
         </div>
         {selectedDriveId && (
-          <Button style={btnPrimary} icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+          <Button
+            style={btnPrimary}
+            icon={<PlusOutlined />}
+            onClick={() => {
+              form.setFieldsValue({
+                title: `Round ${rounds.length + 1}`,
+                durationMinutes: 45,
+                cutoffScore: 50,
+              });
+              setAddModalOpen(true);
+            }}
+          >
             Add Round
           </Button>
         )}
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20, padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Text style={{ color: theme.textSecondary, fontWeight: 500, whiteSpace: 'nowrap' }}>Select Drive:</Text>
+      {/* Drive Selector Ribbon */}
+      <div style={{
+        borderRadius: 12,
+        backgroundColor: '#121216',
+        border: '1px solid #27272A',
+        padding: '16px 20px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+              Target Drive:
+            </span>
+          </div>
           <Select
-            placeholder="Choose a drive..."
+            placeholder="Choose a drive to configure rounds..."
             value={selectedDriveId}
             onChange={(v) => setSelectedDriveId(v)}
-            style={{ width: 340 }}
+            style={{ minWidth: 320, maxWidth: 440, flex: 1 }}
             allowClear
             className="dark-select"
             popupClassName="dark-dropdown"
           >
             {drives.map((d) => (
-              <Option key={d.id} value={d.id}>{d.id} — {d.title}</Option>
+              <Option key={d.id} value={d.id}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{d.title}</span>
+                  <span style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    color: d.status === 'PUBLISHED' ? '#10B981' : d.status === 'DRAFT' ? '#F59E0B' : '#EF4444',
+                    backgroundColor: d.status === 'PUBLISHED' ? 'rgba(16, 185, 129, 0.15)' : d.status === 'DRAFT' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  }}>
+                    {d.status}
+                  </span>
+                </div>
+              </Option>
             ))}
           </Select>
         </div>
+
+        {selectedDrive && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 12px',
+              borderRadius: 8,
+              backgroundColor: '#18181B',
+              border: '1px solid #27272A',
+              color: '#A1A1AA',
+              fontSize: 12,
+            }}>
+              <OrderedListOutlined style={{ color: '#3B82F6' }} />
+              <strong style={{ color: '#FAFAFA' }}>{rounds.length}</strong> {rounds.length === 1 ? 'Round' : 'Rounds'} Configured
+            </span>
+            <Button
+              style={btnGhost}
+              icon={<ReloadOutlined />}
+              onClick={fetchRounds}
+              loading={loading}
+            >
+              Refresh
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* Main Table or Empty Prompt */}
       {!selectedDriveId ? (
-        <div style={{ ...glassCard, textAlign: 'center', padding: '48px 24px' }}>
-          <OrderedListOutlined style={{ fontSize: 40, color: theme.textMuted, marginBottom: 12 }} />
-          <div style={{ color: theme.textSecondary, fontSize: 15 }}>Select a drive above to manage its rounds</div>
+        <div style={{
+          borderRadius: 12,
+          backgroundColor: '#121216',
+          border: '1px solid #27272A',
+          padding: '64px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+          }}>
+            <OrderedListOutlined style={{ fontSize: 30, color: '#71717A' }} />
+          </div>
+          <h3 style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 16, margin: 0 }}>
+            No Drive Selected
+          </h3>
+          <p style={{ color: '#A1A1AA', fontSize: 13, marginTop: 6, marginBottom: 0, maxWidth: 360 }}>
+            Select a recruitment drive from the dropdown above to view, configure, and manage its sequential hiring rounds.
+          </p>
         </div>
       ) : (
-        <div style={cardStyle}>
+        <div style={{
+          borderRadius: 12,
+          backgroundColor: '#121216',
+          border: '1px solid #27272A',
+          overflow: 'hidden',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+        }}>
           <Table
-            columns={columns} dataSource={rounds} rowKey="id" loading={loading}
-            pagination={false} size="middle" className="dark-table"
+            columns={columns}
+            dataSource={rounds}
+            rowKey="id"
+            loading={loading}
+            pagination={false}
+            size="middle"
+            className="dark-table"
+            locale={{
+              emptyText: (
+                <div style={{ padding: '48px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 14,
+                    backgroundColor: '#18181B',
+                    border: '1px solid #27272A',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}>
+                    <OrderedListOutlined style={{ fontSize: 26, color: '#71717A' }} />
+                  </div>
+                  <h3 style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 15, margin: 0 }}>
+                    No Rounds Configured
+                  </h3>
+                  <p style={{ color: '#A1A1AA', fontSize: 13, marginTop: 6, marginBottom: 16, maxWidth: 340, textAlign: 'center' }}>
+                    This drive does not have any assessment rounds yet. Add the first round to begin structuring candidate evaluation.
+                  </p>
+                  <Button
+                    style={btnPrimary}
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      form.setFieldsValue({
+                        title: `Round 1 - Technical Assessment`,
+                        durationMinutes: 45,
+                        cutoffScore: 50,
+                      });
+                      setAddModalOpen(true);
+                    }}
+                  >
+                    Add First Round
+                  </Button>
+                </div>
+              ),
+            }}
           />
         </div>
       )}
 
-      {/* Add Round Modal */}
+      {/* ── Modal 1: Add Round ─────────────────────────────────── */}
       <Modal
-        title={<span style={{ color: theme.textPrimary, fontWeight: 700, fontSize: 18 }}>Add New Round</span>}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <OrderedListOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 700, fontSize: 16 }}>
+              Add Assessment Round
+            </span>
+          </div>
+        }
         open={addModalOpen}
-        onCancel={() => { form.resetFields(); setAddModalOpen(false); }}
-        footer={null} destroyOnClose width={500}
-        styles={{ header: { background: theme.surface, borderBottom: `1px solid ${theme.border}` }, body: { background: theme.surface }, content: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radiusLg } }}
+        onCancel={() => {
+          form.resetFields();
+          setAddModalOpen(false);
+        }}
+        footer={null}
+        destroyOnClose
+        width={480}
+        styles={{
+          header: { background: '#121216', borderBottom: '1px solid #27272A', padding: '16px 24px' },
+          body: { background: '#121216', padding: '20px 24px' },
+          content: { background: '#121216', border: '1px solid #27272A', borderRadius: 12, overflow: 'hidden' },
+        }}
       >
-        <Form form={form} layout="vertical" onFinish={handleAddRound} className="dark-form">
-          <Form.Item name="title" label={<span style={{ color: theme.textSecondary }}>Round Title</span>} rules={[{ required: true, message: 'Required' }]}>
-            <Input className="dark-input" placeholder="e.g. Technical Aptitude" />
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleAddRound}
+          initialValues={{ durationMinutes: 45, cutoffScore: 50 }}
+          className="dark-form"
+        >
+          <Form.Item
+            name="title"
+            label="Round Title"
+            rules={[{ required: true, message: 'Please enter a title for this round' }]}
+          >
+            <Input className="dark-input" placeholder="e.g. Technical Aptitude & Coding" />
           </Form.Item>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="durationMinutes" label={<span style={{ color: theme.textSecondary }}>Duration (min)</span>} rules={[{ required: true, message: 'Required' }]} style={{ flex: 1 }}>
-              <InputNumber min={1} style={{ width: '100%' }} className="dark-input" />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item
+              name="durationMinutes"
+              label="Duration (Minutes)"
+              rules={[{ required: true, message: 'Duration is required' }]}
+            >
+              <InputNumber
+                min={1}
+                max={300}
+                style={{ width: '100%' }}
+                className="dark-input"
+                placeholder="e.g. 45"
+              />
             </Form.Item>
-            <Form.Item name="cutoffScore" label={<span style={{ color: theme.textSecondary }}>Cutoff Score</span>} rules={[{ required: true, message: 'Required' }]} style={{ flex: 1 }}>
-              <InputNumber min={0} style={{ width: '100%' }} className="dark-input" />
+
+            <Form.Item
+              name="cutoffScore"
+              label="Cutoff Score (Marks)"
+              rules={[{ required: true, message: 'Cutoff score is required' }]}
+            >
+              <InputNumber
+                min={0}
+                max={1000}
+                style={{ width: '100%' }}
+                className="dark-input"
+                placeholder="e.g. 50"
+              />
             </Form.Item>
           </div>
+
+          <div style={{
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 20,
+            fontSize: 12,
+            color: '#A1A1AA',
+            lineHeight: 1.5,
+          }}>
+            <strong style={{ color: '#3B82F6' }}>Auto-Sequencing:</strong> The backend automatically assigns round number #{rounds.length + 1} to maintain strict pipeline linearity.
+          </div>
+
           <Form.Item style={{ marginBottom: 0 }}>
-            <Button style={{ ...btnPrimary, width: '100%', height: 42 }} htmlType="submit" loading={submitting}>
-              Create Round
+            <Button
+              style={{ ...btnPrimary, width: '100%', height: 42, justifyContent: 'center' }}
+              htmlType="submit"
+              loading={submitting}
+            >
+              Create Assessment Round
             </Button>
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* Assign Questions Modal */}
+      {/* ── Modal 2: Assign Questions (The Bridge) ─────────────── */}
       <Modal
-        title={<span style={{ color: theme.textPrimary, fontWeight: 700, fontSize: 18 }}>Assign Questions to Round</span>}
-        open={assignModalOpen}
-        onCancel={() => { setAssignModalOpen(false); setSelectedQuestionIds([]); }}
-        onOk={handleAssign}
-        confirmLoading={submitting}
-        okText="Assign Selected"
-        width={720}
-        okButtonProps={{ style: btnPrimary }}
-        cancelButtonProps={{ style: btnGhost }}
-        styles={{ header: { background: theme.surface, borderBottom: `1px solid ${theme.border}` }, body: { background: theme.surface }, content: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radiusLg }, footer: { background: theme.surface, borderTop: `1px solid ${theme.border}` } }}
-      >
-        {questions.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0' }}>
-            <FileTextOutlined style={{ fontSize: 36, color: theme.textMuted, marginBottom: 8 }} />
-            <div style={{ color: theme.textSecondary }}>No questions in the question bank yet.</div>
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileTextOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+              <div>
+                <span style={{ color: '#FAFAFA', fontWeight: 700, fontSize: 16 }}>
+                  Manage Questions
+                </span>
+                {activeRound && (
+                  <span style={{ color: '#A1A1AA', fontSize: 13, fontWeight: 400, marginLeft: 8 }}>
+                    — Round #{activeRound.roundNumber}: {activeRound.title}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        ) : (
-          <div style={{ maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
-            {questions.map((q) => (
-              <div key={q.id} style={{
-                padding: '12px 16px', marginBottom: 8, borderRadius: theme.radius,
-                background: selectedQuestionIds.includes(q.id) ? theme.primaryGlow : theme.surfaceHigh,
-                border: `1px solid ${selectedQuestionIds.includes(q.id) ? theme.primary : theme.border}`,
-                cursor: 'pointer', transition: theme.transition,
-              }}
+        }
+        open={assignModalOpen}
+        onCancel={() => {
+          setAssignModalOpen(false);
+          setActiveRound(null);
+          setSelectedQuestionIds([]);
+        }}
+        footer={
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+              <span style={{ color: '#A1A1AA' }}>
+                Selected: <strong style={{ color: '#3B82F6' }}>{selectedQuestionIds.length}</strong> questions
+              </span>
+              <span style={{ color: '#27272A' }}>•</span>
+              <span style={{ color: '#A1A1AA' }}>
+                Total Marks: <strong style={{ color: '#10B981' }}>{totalSelectedMarks} pts</strong>
+              </span>
+              {activeRound && (
+                <>
+                  <span style={{ color: '#27272A' }}>•</span>
+                  <span style={{ color: '#A1A1AA' }}>
+                    Cutoff: <strong style={{ color: '#F59E0B' }}>{activeRound.cutoffScore ?? 0} pts</strong>
+                  </span>
+                </>
+              )}
+            </div>
+            <Space size={10}>
+              <Button
+                style={btnGhost}
                 onClick={() => {
-                  setSelectedQuestionIds((prev) =>
-                    prev.includes(q.id) ? prev.filter((x) => x !== q.id) : [...prev, q.id]
-                  );
+                  setAssignModalOpen(false);
+                  setActiveRound(null);
+                  setSelectedQuestionIds([]);
                 }}
               >
-                <Checkbox
-                  checked={selectedQuestionIds.includes(q.id)}
-                  style={{ marginRight: 12 }}
-                  onChange={(e) => {
-                    setSelectedQuestionIds((prev) =>
-                      e.target.checked ? [...prev, q.id] : prev.filter((x) => x !== q.id)
-                    );
-                  }}
-                >
-                  <span style={{ color: theme.textMuted, fontFamily: 'monospace', fontSize: 11, marginRight: 8 }}>#{q.id}</span>
-                  <span style={{ color: theme.textPrimary, fontSize: 13 }}>
-                    {q.questionText && q.questionText.length > 80
-                      ? q.questionText.slice(0, 80) + '…'
-                      : q.questionText}
-                  </span>
-                  <span style={{ marginLeft: 12 }}>
-                    <span style={{
-                      color: q.questionType === 'MCQ' ? theme.primary : theme.warning,
-                      background: q.questionType === 'MCQ' ? theme.primaryGlow : theme.warningGlow,
-                      padding: '1px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600, marginRight: 6,
-                    }}>{q.questionType}</span>
-                    <span style={{
-                      color: theme.accent, background: theme.accentGlow,
-                      padding: '1px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600,
-                    }}>{q.marks} pts</span>
-                  </span>
-                </Checkbox>
-              </div>
-            ))}
+                Cancel
+              </Button>
+              <Button
+                style={btnPrimary}
+                onClick={handleSaveQuestions}
+                loading={submitting}
+              >
+                Save Assignment ({selectedQuestionIds.length})
+              </Button>
+            </Space>
           </div>
-        )}
+        }
+        destroyOnClose
+        width={840}
+        styles={{
+          header: { background: '#121216', borderBottom: '1px solid #27272A', padding: '16px 24px' },
+          body: { background: '#121216', padding: '20px 24px' },
+          content: { background: '#121216', border: '1px solid #27272A', borderRadius: 12, overflow: 'hidden' },
+          footer: { background: '#121216', borderTop: '1px solid #27272A', padding: '14px 24px' },
+        }}
+      >
+        {/* Search and Type Filter Ribbon */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+          <Input
+            placeholder="Search questions by text, tag, or ID..."
+            prefix={<SearchOutlined style={{ color: '#71717A', marginRight: 6 }} />}
+            value={questionFilter}
+            onChange={(e) => setQuestionFilter(e.target.value)}
+            style={{
+              flex: 1,
+              backgroundColor: '#18181B',
+              border: '1px solid #27272A',
+              color: '#FAFAFA',
+              borderRadius: 8,
+              height: 38,
+            }}
+          />
+          <Select
+            value={questionTypeFilter}
+            onChange={(v) => setQuestionTypeFilter(v)}
+            style={{ width: 160 }}
+            className="dark-select"
+            popupClassName="dark-dropdown"
+          >
+            <Option value="ALL">All Types</Option>
+            <Option value="MCQ">MCQ Only</Option>
+            <Option value="SUBJECTIVE">Subjective Only</Option>
+          </Select>
+        </div>
+
+        {/* Multi-Select Question Bank Table */}
+        <div style={{
+          border: '1px solid #27272A',
+          borderRadius: 8,
+          overflow: 'hidden',
+          backgroundColor: '#09090B',
+        }}>
+          <Table
+            columns={assignTableColumns}
+            dataSource={filteredQuestions}
+            rowKey="id"
+            loading={assignLoading}
+            rowSelection={{
+              type: 'checkbox',
+              selectedRowKeys: selectedQuestionIds,
+              onChange: (keys) => setSelectedQuestionIds(keys),
+            }}
+            pagination={{
+              pageSize: 6,
+              showSizeChanger: false,
+              size: 'small',
+            }}
+            size="small"
+            className="dark-table"
+            locale={{
+              emptyText: (
+                <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                  <FileTextOutlined style={{ fontSize: 32, color: '#71717A', marginBottom: 8 }} />
+                  <div style={{ color: '#A1A1AA', fontSize: 13 }}>No questions found matching the filter.</div>
+                </div>
+              ),
+            }}
+          />
+        </div>
       </Modal>
     </>
   );
@@ -1347,6 +1928,7 @@ const RoundsSection = ({ initialDriveId }) => {
 // SECTION 4 — RESULTS
 // ═══════════════════════════════════════════════════════════════════
 const ResultsSection = () => {
+  const { user } = useAuth();
   const [drives, setDrives] = useState([]);
   const [selectedDriveId, setSelectedDriveId] = useState(null);
   const [rounds, setRounds] = useState([]);
@@ -1357,9 +1939,10 @@ const ResultsSection = () => {
   const [advancing, setAdvancing] = useState(false);
   const [releasingKey, setReleasingKey] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const { user } = useAuth();
   const [reviewResult, setReviewResult] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [reviewForm] = Form.useForm();
 
   // 1. Fetch drives
@@ -1510,9 +2093,6 @@ const ResultsSection = () => {
       setSubmittingReview(false);
     }
   };
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Determine candidate display status
   const cutoff = activeRound?.cutoffScore ?? 0;
@@ -1847,7 +2427,41 @@ const ResultsSection = () => {
         )}
       </div>
 
-      {resultsData && (
+      {/* Results View Container */}
+      {!selectedDriveId || !selectedRoundId ? (
+        <div style={{
+          borderRadius: 12,
+          backgroundColor: '#121216',
+          border: '1px solid #27272A',
+          padding: '64px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+          }}>
+            <BarChartOutlined style={{ fontSize: 30, color: '#71717A' }} />
+          </div>
+          <h3 style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 16, margin: 0 }}>
+            Select Drive & Round
+          </h3>
+          <p style={{ color: '#A1A1AA', fontSize: 13, marginTop: 6, marginBottom: 0, maxWidth: 380 }}>
+            Choose a recruitment drive and active round from the controls above to inspect student test submissions and scorecards.
+          </p>
+        </div>
+      ) : (
         <>
           {/* Dynamic 4-Metric Statistics Ribbon */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -2006,29 +2620,7 @@ const ResultsSection = () => {
               }}
             />
           </div>
-
-          {/* Action bar */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-            <Button style={btnPrimary} icon={<RocketOutlined />} onClick={advanceStudents}>
-              Advance Students
-            </Button>
-            <Button style={btnGhost} onClick={releaseKey}>
-              Release Result Key
-            </Button>
-          </div>
         </>
-      )}
-
-      {!resultsData && !loading && (
-        <div style={{ ...glassCard, textAlign: 'center', padding: '48px 24px' }}>
-          <BarChartOutlined style={{ fontSize: 40, color: theme.textMuted, marginBottom: 12 }} />
-          <div style={{ color: theme.textSecondary, fontSize: 15 }}>Select a drive and round above to view results</div>
-        </div>
-      )}
-      {loading && !resultsData && (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <Spin size="large" />
-        </div>
       )}
 
       {/* ── Modal: Review Subjective Answer ─────────────────────── */}
@@ -2235,6 +2827,56 @@ const ShortlistSection = () => {
     ? (shortlistedCandidates.reduce((acc, r) => acc + (r.totalScore ?? 0), 0) / shortlistedCandidates.length).toFixed(1)
     : '0.0';
 
+  // Export to CSV Function
+  const handleExportCsv = () => {
+    if (shortlistedCandidates.length === 0) {
+      message.warning('No shortlisted candidates to export');
+      return;
+    }
+
+    const headers = [
+      'Rank',
+      'Student ID',
+      'MCQ Score',
+      'Subjective Score',
+      'Total Score',
+      'Percentile',
+      'Status',
+      'Drive Title',
+      'Round Number',
+    ];
+
+    const rows = shortlistedCandidates.map((r, idx) => [
+      idx + 1,
+      `STU-${r.studentId}`,
+      r.mcqScore ?? 0,
+      r.subjectiveScore ?? 0,
+      r.totalScore ?? 0,
+      r.percentile != null ? `${Number(r.percentile).toFixed(1)}%` : 'N/A',
+      'ADVANCED',
+      `"${selectedDrive?.title || 'Drive'}"`,
+      `"Round #${activeRound?.roundNumber || selectedRoundId}"`,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const safeDriveTitle = (selectedDrive?.title || 'drive').replace(/[^a-zA-Z0-9]/g, '_');
+    link.setAttribute(
+      'download',
+      `Shortlist_${safeDriveTitle}_Round_${activeRound?.roundNumber || '1'}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    message.success('Shortlist exported to CSV successfully');
+  };
+
   const medalColors = ['#FFD700', '#E2E8F0', '#CD7F32'];
 
   const columns = [
@@ -2422,6 +3064,16 @@ const ShortlistSection = () => {
             Finalized list of top-performing candidates who qualified above the round cutoff score.
           </p>
         </div>
+
+        {selectedRoundId && shortlistedCandidates.length > 0 && (
+          <Button
+            style={btnPrimary}
+            icon={<DownloadOutlined />}
+            onClick={handleExportCsv}
+          >
+            Export to CSV ({shortlistedCandidates.length})
+          </Button>
+        )}
       </div>
 
       {/* Cascading Drive & Round Selector Ribbon */}
