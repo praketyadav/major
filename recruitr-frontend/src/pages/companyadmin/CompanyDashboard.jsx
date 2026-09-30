@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 import axiosInstance from '../../api/axiosInstance';
+import driveService from '../../services/api/driveService';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -176,7 +177,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
   const fetchDrives = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axiosInstance.get('/api/v1/drives');
+      const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
       message.error('Failed to fetch drives');
