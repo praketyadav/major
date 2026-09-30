@@ -208,7 +208,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
 
   const publishDrive = async (id) => {
     try {
-      await axiosInstance.patch(`/api/v1/drives/${id}/publish`);
+      await driveService.publishDrive(id);
       message.success('Drive published');
       fetchDrives();
     } catch (e) {
@@ -218,7 +218,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
 
   const closeDrive = async (id) => {
     try {
-      await axiosInstance.patch(`/api/v1/drives/${id}/close`);
+      await driveService.closeDrive(id);
       message.success('Drive closed');
       fetchDrives();
     } catch (e) {
@@ -228,7 +228,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
 
   const deleteDrive = async (id) => {
     try {
-      await axiosInstance.delete(`/api/v1/drives/${id}`);
+      await driveService.deleteDrive(id);
       message.success('Drive deleted');
       fetchDrives();
     } catch (e) {
