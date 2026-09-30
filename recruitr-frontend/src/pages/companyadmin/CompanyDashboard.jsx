@@ -18,6 +18,7 @@ import { useAuth } from '../../auth/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 import axiosInstance from '../../api/axiosInstance';
 import driveService from '../../services/api/driveService';
+import questionService from '../../services/api/questionService';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -180,13 +181,15 @@ const MyDrivesSection = ({ onManageRounds }) => {
       const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch drives');
+      message.error(e.response?.data?.message || 'Failed to fetch drives');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchDrives(); }, [fetchDrives]);
+  useEffect(() => {
+    fetchDrives();
+  }, [fetchDrives]);
 
   const handleCreate = async (values) => {
     setSubmitting(true);
@@ -195,12 +198,12 @@ const MyDrivesSection = ({ onManageRounds }) => {
         title: values.title.trim(),
         description: values.description ? values.description.trim() : '',
       });
-      message.success('Drive created');
+      message.success('Drive created successfully');
       form.resetFields();
       setModalOpen(false);
       fetchDrives();
     } catch (e) {
-      message.error('Failed to create drive');
+      message.error(e.response?.data?.message || 'Failed to create drive');
     } finally {
       setSubmitting(false);
     }
@@ -209,30 +212,30 @@ const MyDrivesSection = ({ onManageRounds }) => {
   const publishDrive = async (id) => {
     try {
       await driveService.publishDrive(id);
-      message.success('Drive published');
+      message.success('Drive published successfully');
       fetchDrives();
     } catch (e) {
-      message.error('Failed to publish drive');
+      message.error(e.response?.data?.message || 'Failed to publish drive');
     }
   };
 
   const closeDrive = async (id) => {
     try {
       await driveService.closeDrive(id);
-      message.success('Drive closed');
+      message.success('Drive closed successfully');
       fetchDrives();
     } catch (e) {
-      message.error('Failed to close drive');
+      message.error(e.response?.data?.message || 'Failed to close drive');
     }
   };
 
   const deleteDrive = async (id) => {
     try {
       await driveService.deleteDrive(id);
-      message.success('Drive deleted');
+      message.success('Drive deleted successfully');
       fetchDrives();
     } catch (e) {
-      message.error('Failed to delete drive');
+      message.error(e.response?.data?.message || 'Failed to delete drive');
     }
   };
 
@@ -562,47 +565,50 @@ const QuestionBankSection = () => {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [questionType, setQuestionType] = useState(null);
+  const [questionType, setQuestionType] = useState('MCQ');
+  const [filterText, setFilterText] = useState('');
   const [form] = Form.useForm();
 
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axiosInstance.get('/api/v1/questions');
+      const res = await questionService.getQuestions();
       setQuestions(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch questions');
+      message.error(e.response?.data?.message || 'Failed to fetch questions');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
+  useEffect(() => {
+    fetchQuestions();
+  }, [fetchQuestions]);
 
   const handleCreate = async (values) => {
     setSubmitting(true);
     try {
       const body = {
-        questionText: values.questionText,
+        questionText: values.questionText.trim(),
         questionType: values.questionType,
-        marks: values.marks,
-        tags: values.tags || '',
+        marks: Number(values.marks),
+        tags: values.tags ? values.tags.trim() : '',
       };
       if (values.questionType === 'MCQ') {
-        body.optionA = values.optionA;
-        body.optionB = values.optionB;
-        body.optionC = values.optionC;
-        body.optionD = values.optionD;
+        body.optionA = values.optionA ? values.optionA.trim() : '';
+        body.optionB = values.optionB ? values.optionB.trim() : '';
+        body.optionC = values.optionC ? values.optionC.trim() : '';
+        body.optionD = values.optionD ? values.optionD.trim() : '';
         body.correctOption = values.correctOption;
       }
-      await axiosInstance.post('/api/v1/questions', body);
-      message.success('Question created');
+      await questionService.createQuestion(body);
+      message.success('Question added to bank successfully');
       form.resetFields();
-      setQuestionType(null);
+      setQuestionType('MCQ');
       setModalOpen(false);
       fetchQuestions();
     } catch (e) {
-      message.error('Failed to create question');
+      message.error(e.response?.data?.message || 'Failed to create question');
     } finally {
       setSubmitting(false);
     }
@@ -610,11 +616,11 @@ const QuestionBankSection = () => {
 
   const deleteQuestion = async (id) => {
     try {
-      await axiosInstance.delete(`/api/v1/questions/${id}`);
-      message.success('Question deleted');
+      await questionService.deleteQuestion(id);
+      message.success('Question removed from bank');
       fetchQuestions();
     } catch (e) {
-      message.error('Failed to delete question');
+      message.error(e.response?.data?.message || 'Failed to delete question');
     }
   };
 
@@ -622,132 +628,407 @@ const QuestionBankSection = () => {
     const isMCQ = t === 'MCQ';
     return (
       <span style={{
-        color: isMCQ ? theme.primary : theme.warning,
-        background: isMCQ ? theme.primaryGlow : theme.warningGlow,
-        padding: '2px 10px', borderRadius: 20, fontSize: 11,
-        fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+        color: isMCQ ? '#60A5FA' : '#C084FC',
+        backgroundColor: isMCQ ? 'rgba(59, 130, 246, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+        border: `1px solid ${isMCQ ? 'rgba(59, 130, 246, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
+        padding: '3px 10px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
       }}>
-        {t}
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          backgroundColor: isMCQ ? '#3B82F6' : '#A855F7',
+        }} />
+        {isMCQ ? 'MCQ' : 'Subjective'}
       </span>
     );
   };
 
+  const filteredQuestions = questions.filter(q => {
+    if (!filterText) return true;
+    const search = filterText.toLowerCase();
+    return (
+      (q.questionText && q.questionText.toLowerCase().includes(search)) ||
+      (q.tags && q.tags.toLowerCase().includes(search)) ||
+      (q.questionType && q.questionType.toLowerCase().includes(search)) ||
+      (q.id && String(q.id).toLowerCase().includes(search))
+    );
+  });
+
   const columns = [
     {
-      title: 'ID', dataIndex: 'id', key: 'id', width: 60,
-      render: (v) => <Text style={{ color: theme.textMuted, fontFamily: 'monospace', fontSize: 12 }}>{v}</Text>,
+      title: 'ID', dataIndex: 'id', key: 'id', width: 80,
+      render: (v) => <span style={{ color: '#71717A', fontFamily: 'monospace', fontSize: 12 }}>#{v}</span>,
     },
     {
-      title: 'Question Text', dataIndex: 'questionText', key: 'questionText',
+      title: 'TYPE', dataIndex: 'questionType', key: 'questionType', width: 140,
+      render: (t) => typeTag(t),
+    },
+    {
+      title: 'QUESTION TEXT', dataIndex: 'questionText', key: 'questionText',
       render: (t) => (
-        <Text style={{ color: theme.textPrimary, fontSize: 13 }}>
-          {t && t.length > 60 ? t.slice(0, 60) + '…' : t}
-        </Text>
+        <Tooltip title={t && t.length > 80 ? t : null}>
+          <span style={{ color: '#FAFAFA', fontSize: 13, fontWeight: 500 }}>
+            {t && t.length > 80 ? t.slice(0, 80) + '…' : t}
+          </span>
+        </Tooltip>
       ),
     },
-    { title: 'Type', dataIndex: 'questionType', key: 'questionType', width: 120, render: (t) => typeTag(t) },
     {
-      title: 'Marks', dataIndex: 'marks', key: 'marks', width: 80,
-      render: (m) => <Text style={{ color: theme.accent, fontWeight: 700 }}>{m}</Text>,
+      title: 'MARKS', dataIndex: 'marks', key: 'marks', width: 90, align: 'center',
+      render: (m) => (
+        <span style={{
+          color: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
+          padding: '2px 8px',
+          borderRadius: 6,
+          fontWeight: 700,
+          fontSize: 12,
+        }}>
+          {m} pts
+        </span>
+      ),
     },
     {
-      title: 'Tags', dataIndex: 'tags', key: 'tags', width: 160,
-      render: (t) => <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t || '—'}</Text>,
+      title: 'TAGS', dataIndex: 'tags', key: 'tags', width: 180,
+      render: (t) => {
+        if (!t) return <span style={{ color: '#71717A', fontSize: 12 }}>—</span>;
+        const tagList = t.split(',').map(s => s.trim()).filter(Boolean);
+        return (
+          <Space size={4} wrap>
+            {tagList.map((tag, idx) => (
+              <span key={idx} style={{
+                color: '#A1A1AA',
+                backgroundColor: '#18181B',
+                border: '1px solid #27272A',
+                padding: '2px 8px',
+                borderRadius: 9999,
+                fontSize: 11,
+              }}>
+                {tag}
+              </span>
+            ))}
+          </Space>
+        );
+      },
     },
     {
-      title: 'Actions', key: 'actions', width: 100,
+      title: 'ACTIONS', key: 'actions', width: 110, align: 'right',
       render: (_, record) => (
-        <Popconfirm title="Delete this question?" onConfirm={() => deleteQuestion(record.id)}
-          okButtonProps={{ style: btnPrimary }} cancelButtonProps={{ style: btnGhost }}>
-          <Button size="small" style={btnDanger} icon={<DeleteOutlined />}>Delete</Button>
+        <Popconfirm
+          title="Delete Question"
+          description="Are you sure you want to remove this question from the bank?"
+          onConfirm={() => deleteQuestion(record.id)}
+          okButtonProps={{ style: btnPrimary }}
+          cancelButtonProps={{ style: btnGhost }}
+        >
+          <Button size="small" style={{ ...btnDanger, height: 30, padding: '0 10px', fontSize: 12 }} icon={<DeleteOutlined />}>
+            Delete
+          </Button>
         </Popconfirm>
       ),
     },
   ];
 
-  // Stats
+  // Stats computation
   const totalQ = questions.length;
   const mcqCount = questions.filter(q => q.questionType === 'MCQ').length;
   const subCount = questions.filter(q => q.questionType === 'SUBJECTIVE').length;
 
   return (
     <>
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Total Questions', value: totalQ, color: '#FAFAFA' },
-          { label: 'MCQ', value: mcqCount, color: '#10B981' },
-          { label: 'Subjective', value: subCount, color: '#F59E0B' },
-        ].map((s) => (
-          <div key={s.label} style={{ ...statCardStyle(), flex: '1 1 160px', minWidth: 140 }}>
-            <div style={{ color: s.color, fontSize: 28, fontWeight: 800, lineHeight: 1, fontFamily: theme.font }}>{s.value}</div>
-            <div style={{ color: theme.textMuted, fontSize: 12, marginTop: 6, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-          </div>
-        ))}
+      {/* Top Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#A1A1AA' }}>
+          <span style={{ color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BankOutlined style={{ fontSize: 14 }} />
+            Company Console
+          </span>
+          <span style={{ color: '#71717A' }}>›</span>
+          <span style={{ color: '#FAFAFA', fontWeight: 600 }}>Question Bank</span>
+        </div>
       </div>
 
-      <div style={sectionHeader}>
+      {/* Hero Header & Global Action */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={pageTitle}>Question Bank</div>
-          <div style={sectionSubtext}>Manage your assessment question library</div>
+          <h1 style={{ color: '#FAFAFA', fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>Question Bank</h1>
+          <p style={{ color: '#A1A1AA', fontSize: 13, margin: '4px 0 0 0' }}>
+            Author, categorize, and organize MCQ and subjective questions for your assessment rounds.
+          </p>
         </div>
-        <Button style={btnPrimary} icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+        <Button style={btnPrimary} icon={<PlusOutlined />} onClick={() => { form.setFieldsValue({ questionType: 'MCQ', marks: 1 }); setQuestionType('MCQ'); setModalOpen(true); }}>
           Add Question
         </Button>
       </div>
 
-      <div style={cardStyle}>
+      {/* 3 Top Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {/* Card 1: Total Questions */}
+        <div style={{
+          position: 'relative', overflow: 'hidden', borderRadius: 12,
+          backgroundColor: '#121216', border: '1px solid #27272A',
+          padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+              TOTAL QUESTIONS
+            </span>
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#18181B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A' }}>
+              <FileTextOutlined style={{ fontSize: 16 }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 32, fontWeight: 700, color: '#FAFAFA', letterSpacing: '-0.02em', lineHeight: 1 }}>{totalQ}</span>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#71717A' }}>{totalQ > 0 ? `${totalQ} Total` : '0 Items'}</span>
+          </div>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(140, 144, 159, 0.4), transparent)' }} />
+        </div>
+
+        {/* Card 2: MCQ Questions */}
+        <div style={{
+          position: 'relative', overflow: 'hidden', borderRadius: 12,
+          backgroundColor: '#121216', border: '1px solid #27272A',
+          padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+              MCQ QUESTIONS
+            </span>
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+              <OrderedListOutlined style={{ fontSize: 16 }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 32, fontWeight: 700, color: '#60A5FA', letterSpacing: '-0.02em', lineHeight: 1 }}>{mcqCount}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600, backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA' }}>
+              {totalQ > 0 ? `${Math.round((mcqCount / totalQ) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent)' }} />
+        </div>
+
+        {/* Card 3: Subjective Questions */}
+        <div style={{
+          position: 'relative', overflow: 'hidden', borderRadius: 12,
+          backgroundColor: '#121216', border: '1px solid #27272A',
+          padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+              SUBJECTIVE
+            </span>
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A855F7' }}>
+              <EditOutlined style={{ fontSize: 16 }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 32, fontWeight: 700, color: '#C084FC', letterSpacing: '-0.02em', lineHeight: 1 }}>{subCount}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 600, backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#C084FC' }}>
+              {totalQ > 0 ? `${Math.round((subCount / totalQ) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent)' }} />
+        </div>
+      </div>
+
+      {/* Search & Filter Ribbon */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <Input
+          placeholder="Filter by question text, tags, or type..."
+          prefix={<SearchOutlined style={{ color: '#71717A', marginRight: 6 }} />}
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          style={{
+            width: 320, backgroundColor: '#121216', border: '1px solid #27272A',
+            color: '#FAFAFA', borderRadius: 8, height: 38,
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Button style={btnGhost} icon={<ReloadOutlined />} onClick={fetchQuestions}>
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Data Table with Dark Styling & Empty State */}
+      <div style={{
+        borderRadius: 12, backgroundColor: '#121216', border: '1px solid #27272A',
+        overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+      }}>
         <Table
-          columns={columns} dataSource={questions} rowKey="id" loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: false }}
-          size="middle" className="dark-table"
+          columns={columns}
+          dataSource={filteredQuestions}
+          rowKey="id"
+          loading={loading}
+          pagination={filteredQuestions.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
+          size="middle"
+          className="dark-table"
+          locale={{
+            emptyText: (
+              <div style={{ padding: '64px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 80, height: 80, marginBottom: 20 }}>
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.12)', filter: 'blur(16px)' }} />
+                  <div style={{
+                    position: 'relative', width: 64, height: 64, borderRadius: 16,
+                    background: '#18181B', border: '1px solid #27272A',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+                  }}>
+                    <FileTextOutlined style={{ fontSize: 30, color: '#71717A' }} />
+                  </div>
+                </div>
+                <h3 style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 16, margin: 0, letterSpacing: '-0.01em' }}>No Questions Found</h3>
+                <p style={{ color: '#A1A1AA', fontSize: 13, marginTop: 6, marginBottom: 20, maxWidth: 360, textAlign: 'center', lineHeight: 1.5 }}>
+                  Your question library is currently empty. Click “+ Add Question” to create assessment items for your hiring rounds.
+                </p>
+                <Button
+                  style={{
+                    backgroundColor: '#18181B',
+                    border: '1px solid #27272A',
+                    color: '#3B82F6',
+                    borderRadius: 8,
+                    height: 38,
+                    fontWeight: 500,
+                    fontSize: 13,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                  icon={<PlusOutlined />}
+                  onClick={() => { form.setFieldsValue({ questionType: 'MCQ', marks: 1 }); setQuestionType('MCQ'); setModalOpen(true); }}
+                >
+                  Create First Question
+                </Button>
+              </div>
+            ),
+          }}
         />
       </div>
 
+      {/* Dynamic Add Question Modal */}
       <Modal
         title={<span style={{ color: theme.textPrimary, fontWeight: 700, fontSize: 18 }}>Add New Question</span>}
         open={modalOpen}
-        onCancel={() => { form.resetFields(); setQuestionType(null); setModalOpen(false); }}
-        footer={null} destroyOnClose width={620}
-        styles={{ header: { background: theme.surface, borderBottom: `1px solid ${theme.border}` }, body: { background: theme.surface }, content: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radiusLg } }}
+        onCancel={() => { form.resetFields(); setQuestionType('MCQ'); setModalOpen(false); }}
+        footer={null}
+        destroyOnClose
+        width={620}
+        styles={{
+          header: { background: theme.surface, borderBottom: `1px solid ${theme.border}` },
+          body: { background: theme.surface },
+          content: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radiusLg },
+        }}
       >
-        <Form form={form} layout="vertical" onFinish={handleCreate} className="dark-form">
-          <Form.Item name="questionText" label={<span style={{ color: theme.textSecondary }}>Question Text</span>} rules={[{ required: true, message: 'Required' }]}>
-            <TextArea rows={3} className="dark-input" placeholder="Enter the question..." />
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleCreate}
+          initialValues={{ questionType: 'MCQ', marks: 1 }}
+          className="dark-form"
+        >
+          <Form.Item
+            name="questionText"
+            label={<span style={{ color: theme.textSecondary }}>Question Text</span>}
+            rules={[{ required: true, message: 'Question text is required' }]}
+          >
+            <TextArea rows={3} className="dark-input" placeholder="e.g. What is the time complexity of binary search?" />
           </Form.Item>
+
           <div style={{ display: 'flex', gap: 16 }}>
-            <Form.Item name="questionType" label={<span style={{ color: theme.textSecondary }}>Type</span>} rules={[{ required: true, message: 'Required' }]} style={{ flex: 1 }}>
-              <Select placeholder="Select type" onChange={(v) => setQuestionType(v)} className="dark-select" popupClassName="dark-dropdown">
-                <Option value="MCQ">MCQ</Option>
-                <Option value="SUBJECTIVE">Subjective</Option>
+            <Form.Item
+              name="questionType"
+              label={<span style={{ color: theme.textSecondary }}>Question Type</span>}
+              rules={[{ required: true, message: 'Question type is required' }]}
+              style={{ flex: 1 }}
+            >
+              <Select
+                placeholder="Select type"
+                onChange={(v) => setQuestionType(v)}
+                className="dark-select"
+                popupClassName="dark-dropdown"
+              >
+                <Option value="MCQ">MCQ (Multiple Choice)</Option>
+                <Option value="SUBJECTIVE">Subjective / Coding</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="marks" label={<span style={{ color: theme.textSecondary }}>Marks</span>} rules={[{ required: true, message: 'Required' }]} style={{ flex: 1 }}>
-              <InputNumber min={0} style={{ width: '100%' }} className="dark-input" />
+
+            <Form.Item
+              name="marks"
+              label={<span style={{ color: theme.textSecondary }}>Marks / Points</span>}
+              rules={[{ required: true, message: 'Marks are required' }]}
+              style={{ flex: 1 }}
+            >
+              <InputNumber min={1} max={100} style={{ width: '100%' }} className="dark-input" placeholder="e.g. 2" />
             </Form.Item>
           </div>
-          <Form.Item name="tags" label={<span style={{ color: theme.textSecondary }}>Tags</span>}>
-            <Input className="dark-input" placeholder="e.g. aptitude, logical" />
+
+          <Form.Item
+            name="tags"
+            label={<span style={{ color: theme.textSecondary }}>Tags / Categories</span>}
+          >
+            <Input className="dark-input" placeholder="e.g. Algorithms, Data Structures, Java" />
           </Form.Item>
+
+          {/* Question Bank dynamic fields */}
           {questionType === 'MCQ' && (
-            <>
+            <div style={{
+              background: '#121216',
+              border: '1px solid #27272A',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#A1A1AA', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+                Multiple Choice Options
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {['A', 'B', 'C', 'D'].map((opt) => (
-                  <Form.Item key={opt} name={`option${opt}`} label={<span style={{ color: theme.textSecondary }}>Option {opt}</span>} rules={[{ required: true, message: 'Required' }]}>
-                    <Input className="dark-input" />
+                  <Form.Item
+                    key={opt}
+                    name={`option${opt}`}
+                    label={<span style={{ color: theme.textSecondary }}>Option {opt}</span>}
+                    rules={[{ required: true, message: `Option ${opt} is required` }]}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Input className="dark-input" placeholder={`Enter text for Option ${opt}`} />
                   </Form.Item>
                 ))}
               </div>
-              <Form.Item name="correctOption" label={<span style={{ color: theme.textSecondary }}>Correct Option</span>} rules={[{ required: true, message: 'Required' }]}>
-                <Select placeholder="Select correct option" className="dark-select" popupClassName="dark-dropdown">
-                  {['A', 'B', 'C', 'D'].map((o) => <Option key={o} value={o}>{o}</Option>)}
+
+              <Form.Item
+                name="correctOption"
+                label={<span style={{ color: '#10B981', fontWeight: 600 }}>Designate Correct Option</span>}
+                rules={[{ required: true, message: 'Please select the correct option' }]}
+                style={{ marginBottom: 0 }}
+              >
+                <Select
+                  placeholder="Select correct option (A, B, C, or D)"
+                  className="dark-select"
+                  popupClassName="dark-dropdown"
+                >
+                  {['A', 'B', 'C', 'D'].map((o) => (
+                    <Option key={o} value={o}>Option {o}</Option>
+                  ))}
                 </Select>
               </Form.Item>
-            </>
+            </div>
           )}
+
           <Form.Item style={{ marginBottom: 0 }}>
-            <Button style={{ ...btnPrimary, width: '100%', height: 42 }} htmlType="submit" loading={submitting}>
-              Submit Question
+            <Button
+              style={{ ...btnPrimary, width: '100%', height: 42 }}
+              htmlType="submit"
+              loading={submitting}
+            >
+              Save Question to Library
             </Button>
           </Form.Item>
         </Form>
