@@ -1354,6 +1354,8 @@ const ResultsSection = () => {
   const [activeRound, setActiveRound] = useState(null);
   const [resultsData, setResultsData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [releasingKey, setReleasingKey] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const { user } = useAuth();
   const [reviewResult, setReviewResult] = useState(null);
@@ -1435,6 +1437,47 @@ const ResultsSection = () => {
     setActiveRound(round || null);
   };
 
+  // The Engine Trigger: Advance Students
+  const handleAdvanceStudents = async () => {
+    if (!selectedRoundId) return;
+    setAdvancing(true);
+    try {
+      const cutoff = activeRound?.cutoffScore ?? 0;
+      const res = await resultsService.advanceStudents(selectedRoundId, {
+        cutoffScore: cutoff,
+      });
+      const summary = res.data;
+      if (summary) {
+        message.success(
+          `Advancement Complete! ${summary.advanced ?? 0} candidate(s) advanced, ${summary.eliminated ?? 0} eliminated against cutoff of ${cutoff} pts.`,
+          5
+        );
+      } else {
+        message.success('Candidates advanced successfully based on round cutoff');
+      }
+      fetchResults();
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to advance candidates');
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
+  // Release Key
+  const handleReleaseKey = async () => {
+    if (!selectedRoundId) return;
+    setReleasingKey(true);
+    try {
+      await resultsService.releaseResultKey(selectedRoundId);
+      message.success('Assessment scorecard and result key released to candidates');
+      fetchResults();
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to release result key');
+    } finally {
+      setReleasingKey(false);
+    }
+  };
+
   // Subjective Review Modal Handlers
   const openReviewModal = (record) => {
     setReviewResult(record);
@@ -1465,28 +1508,6 @@ const ResultsSection = () => {
       message.error(e.response?.data?.message || 'Failed to submit subjective review');
     } finally {
       setSubmittingReview(false);
-    }
-  };
-
-  const advanceStudents = async () => {
-    try {
-      await axiosInstance.post(`/api/v1/results/round/${selectedRoundId}/advance`, {
-        cutoffScore: roundCutoff,
-      });
-      message.success('Students advanced successfully');
-      fetchResults();
-    } catch (e) {
-      message.error('Failed to advance students');
-    }
-  };
-
-  const releaseKey = async () => {
-    try {
-      await axiosInstance.post(`/api/v1/results/round/${selectedRoundId}/release-key`);
-      message.success('Result key released');
-      fetchResults();
-    } catch (e) {
-      message.error('Failed to release result key');
     }
   };
 
@@ -1709,11 +1730,49 @@ const ResultsSection = () => {
 
   return (
     <>
-      <div style={sectionHeader}>
-        <div>
-          <div style={pageTitle}>Results & Evaluations</div>
-          <div style={sectionSubtext}>Review scores, evaluate subjective answers, and advance candidates</div>
+      {/* Top Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#A1A1AA' }}>
+          <span style={{ color: '#71717A', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <BankOutlined style={{ fontSize: 14 }} />
+            Company Console
+          </span>
+          <span style={{ color: '#71717A' }}>›</span>
+          <span style={{ color: '#FAFAFA', fontWeight: 600 }}>Results & Assessment Pipeline</span>
         </div>
+      </div>
+
+      {/* Hero Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 style={{ color: '#FAFAFA', fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
+            Results & Evaluations
+          </h1>
+          <p style={{ color: '#A1A1AA', fontSize: 13, margin: '4px 0 0 0' }}>
+            Inspect candidate scores, evaluate subjective responses, and trigger pipeline advancement against cutoffs.
+          </p>
+        </div>
+
+        {selectedRoundId && resultsData && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Button
+              style={btnGhost}
+              icon={<CheckCircleOutlined />}
+              onClick={handleReleaseKey}
+              loading={releasingKey}
+            >
+              Release Result Key
+            </Button>
+            <Button
+              style={btnPrimary}
+              icon={<RocketOutlined />}
+              onClick={handleAdvanceStudents}
+              loading={advancing}
+            >
+              Generate Shortlist / Advance Candidates
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Cascading Drive & Round Selector Ribbon */}
