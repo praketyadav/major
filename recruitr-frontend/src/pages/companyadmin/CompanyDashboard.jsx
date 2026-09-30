@@ -19,6 +19,7 @@ import NotificationBell from '../../components/NotificationBell';
 import axiosInstance from '../../api/axiosInstance';
 import driveService from '../../services/api/driveService';
 import questionService from '../../services/api/questionService';
+import resultsService from '../../services/api/resultsService';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -1350,7 +1351,7 @@ const ResultsSection = () => {
   const [selectedDriveId, setSelectedDriveId] = useState(null);
   const [rounds, setRounds] = useState([]);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
-  const [roundCutoff, setRoundCutoff] = useState(0);
+  const [activeRound, setActiveRound] = useState(null);
   const [resultsData, setResultsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -1358,54 +1359,79 @@ const ResultsSection = () => {
   const [submitting, setSubmitting] = useState(false);
   const [reviewForm] = Form.useForm();
 
+  // 1. Fetch drives
   const fetchDrives = useCallback(async () => {
     try {
-      const res = await axiosInstance.get('/api/v1/drives');
+      const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error('Failed to fetch drives');
+      message.error(e.response?.data?.message || 'Failed to fetch drives');
     }
   }, []);
 
-  useEffect(() => { fetchDrives(); }, [fetchDrives]);
+  useEffect(() => {
+    fetchDrives();
+  }, [fetchDrives]);
 
+  // 2. Fetch rounds when drive changes
   const fetchRounds = useCallback(async () => {
-    if (!selectedDriveId) { setRounds([]); return; }
-    try {
-      const res = await axiosInstance.get(`/api/v1/drives/${selectedDriveId}/rounds`);
-      setRounds(res.data || []);
-    } catch (e) {
-      message.error('Failed to fetch rounds');
+    if (!selectedDriveId) {
+      setRounds([]);
+      setSelectedRoundId(null);
+      setActiveRound(null);
+      setResultsData(null);
+      return;
     }
-  }, [selectedDriveId]);
+    try {
+      const res = await driveService.getRoundsForDrive(selectedDriveId);
+      const roundList = res.data || [];
+      setRounds(roundList);
+      if (roundList.length > 0 && !selectedRoundId) {
+        setSelectedRoundId(roundList[0].id);
+        setActiveRound(roundList[0]);
+      }
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
+    }
+  }, [selectedDriveId, selectedRoundId]);
 
-  useEffect(() => { fetchRounds(); }, [fetchRounds]);
+  useEffect(() => {
+    fetchRounds();
+  }, [fetchRounds]);
 
+  // 3. Fetch candidate results when round changes
   const fetchResults = useCallback(async () => {
-    if (!selectedRoundId) { setResultsData(null); return; }
+    if (!selectedRoundId) {
+      setResultsData(null);
+      return;
+    }
     setLoading(true);
     try {
-      const res = await axiosInstance.get(`/api/v1/results/round/${selectedRoundId}`);
-      setResultsData(res.data);
+      const res = await resultsService.getResultsForRound(selectedRoundId);
+      setResultsData(res.data || null);
     } catch (e) {
-      message.error('Failed to fetch results');
+      message.error(e.response?.data?.message || 'Failed to fetch results for round');
+      setResultsData(null);
     } finally {
       setLoading(false);
     }
   }, [selectedRoundId]);
 
-  useEffect(() => { fetchResults(); }, [fetchResults]);
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults]);
 
   const handleDriveChange = (driveId) => {
     setSelectedDriveId(driveId);
     setSelectedRoundId(null);
+    setActiveRound(null);
     setResultsData(null);
   };
 
   const handleRoundChange = (roundId) => {
     setSelectedRoundId(roundId);
     const round = rounds.find((r) => r.id === roundId);
-    if (round) setRoundCutoff(round.cutoffScore || 0);
+    setActiveRound(round || null);
   };
 
   const openReviewModal = (resultId) => {
