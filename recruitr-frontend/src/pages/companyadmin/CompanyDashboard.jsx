@@ -1482,118 +1482,461 @@ const ResultsSection = () => {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Determine candidate display status
+  const cutoff = activeRound?.cutoffScore ?? 0;
+  const isAdvancementRun = (resultsData?.advanced ?? 0) > 0 || (resultsData?.eliminated ?? 0) > 0;
+
+  const getCandidateStatus = (record) => {
+    if (isAdvancementRun) {
+      return (record.totalScore ?? 0) >= cutoff ? 'ADVANCED' : 'ELIMINATED';
+    }
+    if (record.subjectiveReviewed) {
+      return (record.totalScore ?? 0) >= cutoff ? 'QUALIFIED' : 'EVALUATED';
+    }
+    return 'PENDING';
+  };
+
+  const renderStatusTag = (status) => {
+    const configMap = {
+      ADVANCED: {
+        color: '#10B981',
+        bg: 'rgba(16, 185, 129, 0.12)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        label: 'ADVANCED',
+      },
+      QUALIFIED: {
+        color: '#10B981',
+        bg: 'rgba(16, 185, 129, 0.12)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        label: 'MET CUTOFF',
+      },
+      ELIMINATED: {
+        color: '#EF4444',
+        bg: 'rgba(239, 68, 68, 0.12)',
+        border: '1px solid rgba(239, 68, 68, 0.25)',
+        label: 'ELIMINATED',
+      },
+      EVALUATED: {
+        color: '#3B82F6',
+        bg: 'rgba(59, 130, 246, 0.12)',
+        border: '1px solid rgba(59, 130, 246, 0.25)',
+        label: 'EVALUATED',
+      },
+      PENDING: {
+        color: '#F59E0B',
+        bg: 'rgba(245, 158, 11, 0.12)',
+        border: '1px solid rgba(245, 158, 11, 0.25)',
+        label: 'PENDING REVIEW',
+      },
+    };
+    const cfg = configMap[status] || configMap.PENDING;
+    return (
+      <span style={{
+        color: cfg.color,
+        backgroundColor: cfg.bg,
+        border: cfg.border,
+        padding: '3px 10px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+      }}>
+        <span style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          backgroundColor: cfg.color,
+        }} />
+        {cfg.label}
+      </span>
+    );
+  };
+
+  const allResults = resultsData?.results || [];
+  const filteredResults = allResults.filter((r) => {
+    const status = getCandidateStatus(r);
+    const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
+    const matchesQuery =
+      !searchQuery ||
+      String(r.studentId).includes(searchQuery) ||
+      String(r.id).includes(searchQuery);
+    return matchesStatus && matchesQuery;
+  });
+
   const columns = [
     {
-      title: 'Student ID', dataIndex: 'studentId', key: 'studentId', width: 110,
-      render: (v) => <Text style={{ color: theme.textPrimary, fontFamily: 'monospace', fontSize: 12 }}>{v}</Text>,
+      title: 'CANDIDATE',
+      dataIndex: 'studentId',
+      key: 'studentId',
+      width: 140,
+      render: (v) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            backgroundColor: '#18181B',
+            border: '1px solid #27272A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#3B82F6',
+            fontSize: 12,
+            fontWeight: 700,
+          }}>
+            <TeamOutlined />
+          </div>
+          <div>
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontFamily: 'monospace', fontSize: 13 }}>
+              #STU-{v}
+            </span>
+          </div>
+        </div>
+      ),
     },
     {
-      title: 'MCQ', dataIndex: 'mcqScore', key: 'mcqScore', width: 80,
-      render: (v) => <Text style={{ color: theme.primary, fontWeight: 700 }}>{v}</Text>,
-    },
-    {
-      title: 'Subjective', dataIndex: 'subjectiveScore', key: 'subjectiveScore', width: 110,
-      render: (v) => <Text style={{ color: theme.warning, fontWeight: 700 }}>{v}</Text>,
-    },
-    {
-      title: 'Total', dataIndex: 'totalScore', key: 'totalScore', width: 90,
-      render: (v) => <Text style={{ color: theme.accent, fontWeight: 800, fontSize: 15 }}>{v}</Text>,
-    },
-    {
-      title: 'Percentile', dataIndex: 'percentile', key: 'percentile', width: 100,
-      render: (v) => <Text style={{ color: theme.textSecondary }}>{v != null ? v : '—'}</Text>,
-    },
-    {
-      title: 'Reviewed', dataIndex: 'subjectiveReviewed', key: 'subjectiveReviewed', width: 100,
+      title: 'MCQ SCORE',
+      dataIndex: 'mcqScore',
+      key: 'mcqScore',
+      width: 110,
       render: (v) => (
         <span style={{
-          color: v ? theme.accent : theme.warning,
-          background: v ? theme.accentGlow : theme.warningGlow,
-          padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          color: '#60A5FA',
+          padding: '2px 8px',
+          borderRadius: 6,
+          fontWeight: 600,
+          fontSize: 12,
         }}>
-          {v ? 'Yes' : 'No'}
+          {v ?? 0} pts
         </span>
       ),
     },
     {
-      title: 'Key', dataIndex: 'resultKeyReleased', key: 'resultKeyReleased', width: 80,
-      render: (v) => (
+      title: 'SUBJECTIVE',
+      dataIndex: 'subjectiveScore',
+      key: 'subjectiveScore',
+      width: 120,
+      render: (v, record) => (
         <span style={{
-          color: v ? theme.accent : theme.textMuted,
-          background: v ? theme.accentGlow : theme.surfaceHigh,
-          padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: record.subjectiveReviewed ? 'rgba(168, 85, 247, 0.1)' : '#18181B',
+          border: `1px solid ${record.subjectiveReviewed ? 'rgba(168, 85, 247, 0.25)' : '#27272A'}`,
+          color: record.subjectiveReviewed ? '#C084FC' : '#71717A',
+          padding: '2px 8px',
+          borderRadius: 6,
+          fontWeight: 600,
+          fontSize: 12,
         }}>
-          {v ? '✓' : '—'}
+          {v ?? 0} pts
         </span>
       ),
     },
     {
-      title: 'Actions', key: 'actions', width: 170,
-      render: (_, record) =>
-        !record.subjectiveReviewed ? (
-          <Button size="small" style={btnPrimary} onClick={() => openReviewModal(record.id)}>
-            Review
-          </Button>
-        ) : (
-          <span style={{ color: theme.accent, fontSize: 12, fontWeight: 600 }}>
-            <CheckCircleOutlined /> Reviewed
-          </span>
-        ),
+      title: 'TOTAL SCORE',
+      dataIndex: 'totalScore',
+      key: 'totalScore',
+      width: 120,
+      render: (v) => (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          color: '#10B981',
+          padding: '3px 10px',
+          borderRadius: 6,
+          fontWeight: 700,
+          fontSize: 13,
+        }}>
+          {v ?? 0} pts
+        </span>
+      ),
+    },
+    {
+      title: 'PERCENTILE',
+      dataIndex: 'percentile',
+      key: 'percentile',
+      width: 110,
+      render: (v) => (
+        <span style={{ color: '#A1A1AA', fontFamily: 'monospace', fontSize: 12, fontWeight: 500 }}>
+          {v != null ? `${Number(v).toFixed(1)}%` : '—'}
+        </span>
+      ),
+    },
+    {
+      title: 'STATUS',
+      key: 'status',
+      width: 150,
+      render: (_, record) => renderStatusTag(getCandidateStatus(record)),
+    },
+    {
+      title: 'ACTIONS',
+      key: 'actions',
+      width: 140,
+      align: 'right',
+      render: (_, record) => (
+        <Button
+          size="small"
+          style={record.subjectiveReviewed ? btnGhost : btnPrimary}
+          icon={<EditOutlined />}
+          onClick={() => openReviewModal(record.id)}
+        >
+          {record.subjectiveReviewed ? 'Re-Grade' : 'Review'}
+        </Button>
+      ),
     },
   ];
-
-  const results = resultsData?.results || [];
 
   return (
     <>
       <div style={sectionHeader}>
         <div>
-          <div style={pageTitle}>Results & Analytics</div>
+          <div style={pageTitle}>Results & Evaluations</div>
           <div style={sectionSubtext}>Review scores, evaluate subjective answers, and advance candidates</div>
         </div>
       </div>
 
-      {/* Drive & Round selectors */}
-      <div style={{ ...cardStyle, marginBottom: 20, padding: '16px 20px' }}>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.textSecondary, fontWeight: 500, whiteSpace: 'nowrap' }}>Drive:</Text>
-            <Select placeholder="Select Drive" value={selectedDriveId} onChange={handleDriveChange}
-              style={{ width: 280 }} allowClear className="dark-select" popupClassName="dark-dropdown">
-              {drives.map((d) => <Option key={d.id} value={d.id}>{d.id} — {d.title}</Option>)}
+      {/* Cascading Drive & Round Selector Ribbon */}
+      <div style={{
+        borderRadius: 12,
+        backgroundColor: '#121216',
+        border: '1px solid #27272A',
+        padding: '16px 20px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+      }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+              Drive:
+            </span>
+            <Select
+              placeholder="Choose a Drive..."
+              value={selectedDriveId}
+              onChange={handleDriveChange}
+              style={{ minWidth: 260 }}
+              allowClear
+              className="dark-select"
+              popupClassName="dark-dropdown"
+            >
+              {drives.map((d) => (
+                <Option key={d.id} value={d.id}>
+                  {d.title}
+                </Option>
+              ))}
             </Select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: theme.textSecondary, fontWeight: 500, whiteSpace: 'nowrap' }}>Round:</Text>
-            <Select placeholder="Select Round" value={selectedRoundId} onChange={handleRoundChange}
-              style={{ width: 280 }} allowClear disabled={!selectedDriveId}
-              className="dark-select" popupClassName="dark-dropdown">
-              {rounds.map((r) => <Option key={r.id} value={r.id}>{r.roundNumber ?? r.id} — {r.title}</Option>)}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <OrderedListOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
+              Round:
+            </span>
+            <Select
+              placeholder="Choose a Round..."
+              value={selectedRoundId}
+              onChange={handleRoundChange}
+              style={{ minWidth: 260 }}
+              allowClear
+              disabled={!selectedDriveId || rounds.length === 0}
+              className="dark-select"
+              popupClassName="dark-dropdown"
+            >
+              {rounds.map((r) => (
+                <Option key={r.id} value={r.id}>
+                  #{r.roundNumber} — {r.title} (Cutoff: {r.cutoffScore ?? 0} pts)
+                </Option>
+              ))}
             </Select>
           </div>
         </div>
+
+        {selectedRoundId && (
+          <Button
+            style={btnGhost}
+            icon={<ReloadOutlined />}
+            onClick={fetchResults}
+            loading={loading}
+          >
+            Refresh
+          </Button>
+        )}
       </div>
 
       {resultsData && (
         <>
-          {/* Stats */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Total Attempted', value: resultsData.totalAttempted, color: '#FAFAFA' },
-              { label: 'Average Score', value: resultsData.averageScore?.toFixed(2) || '—', color: '#10B981' },
-            ].map((s) => (
-              <div key={s.label} style={{ ...statCardStyle(), flex: '1 1 200px', minWidth: 180 }}>
-                <div style={{ color: s.color, fontSize: 28, fontWeight: 800, lineHeight: 1, fontFamily: theme.font }}>{s.value}</div>
-                <div style={{ color: theme.textMuted, fontSize: 12, marginTop: 6, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+          {/* Dynamic 4-Metric Statistics Ribbon */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {/* Metric 1: Total Attempted */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  CANDIDATES ATTEMPTED
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: '#18181B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A' }}>
+                  <TeamOutlined style={{ fontSize: 15 }} />
+                </div>
               </div>
-            ))}
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#FAFAFA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {resultsData?.totalAttempted ?? 0}
+                </span>
+                <span style={{ fontSize: 11, color: '#71717A', fontFamily: 'monospace' }}>Submissions</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 2: Passing Cutoff */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  ROUND CUTOFF
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F59E0B' }}>
+                  <OrderedListOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#F59E0B', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {cutoff}
+                </span>
+                <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>Points Required</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 3: Average Score */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  AVERAGE SCORE
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3B82F6' }}>
+                  <BarChartOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#60A5FA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {resultsData?.averageScore ? Number(resultsData.averageScore).toFixed(1) : '0.0'}
+                </span>
+                <span style={{ fontSize: 11, color: '#71717A', fontFamily: 'monospace' }}>Mean Score</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.4), transparent)' }} />
+            </div>
+
+            {/* Metric 4: Advanced Count */}
+            <div style={{
+              position: 'relative', overflow: 'hidden', borderRadius: 12,
+              backgroundColor: '#121216', border: '1px solid #27272A',
+              padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                  ADVANCED TO NEXT
+                </span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                  <TrophyOutlined style={{ fontSize: 15 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: '#10B981', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {resultsData?.advanced ?? allResults.filter(r => (r.totalScore ?? 0) >= cutoff).length}
+                </span>
+                <span style={{ fontSize: 11, color: '#10B981', fontWeight: 600 }}>Qualified</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent)' }} />
+            </div>
           </div>
 
-          <div style={cardStyle}>
+          {/* Filter Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Input
+                placeholder="Search by Student ID..."
+                prefix={<SearchOutlined style={{ color: '#71717A', marginRight: 6 }} />}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: 260,
+                  backgroundColor: '#121216',
+                  border: '1px solid #27272A',
+                  color: '#FAFAFA',
+                  borderRadius: 8,
+                  height: 38,
+                }}
+              />
+              <Select
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v)}
+                style={{ width: 180 }}
+                className="dark-select"
+                popupClassName="dark-dropdown"
+              >
+                <Option value="ALL">All Statuses</Option>
+                <Option value="ADVANCED">Advanced Only</Option>
+                <Option value="QUALIFIED">Met Cutoff</Option>
+                <Option value="ELIMINATED">Eliminated Only</Option>
+                <Option value="PENDING">Pending Review</Option>
+              </Select>
+            </div>
+          </div>
+
+          {/* Data Table */}
+          <div style={{
+            borderRadius: 12,
+            backgroundColor: '#121216',
+            border: '1px solid #27272A',
+            overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}>
             <Table
-              columns={columns} dataSource={results} rowKey="id" loading={loading}
-              pagination={{ pageSize: 10, showSizeChanger: false }}
-              size="middle" className="dark-table"
+              columns={columns}
+              dataSource={filteredResults}
+              rowKey="id"
+              loading={loading}
+              pagination={filteredResults.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
+              size="middle"
+              className="dark-table"
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+                    <BarChartOutlined style={{ fontSize: 32, color: '#71717A', marginBottom: 8 }} />
+                    <div style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 14 }}>No Test Submissions Yet</div>
+                    <div style={{ color: '#A1A1AA', fontSize: 12, marginTop: 4 }}>
+                      Students enrolled in this round have not submitted their assessments yet.
+                    </div>
+                  </div>
+                ),
+              }}
             />
           </div>
 
