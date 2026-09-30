@@ -191,9 +191,9 @@ const MyDrivesSection = ({ onManageRounds }) => {
   const handleCreate = async (values) => {
     setSubmitting(true);
     try {
-      await axiosInstance.post('/api/v1/drives', {
-        title: values.title,
-        description: values.description || '',
+      await driveService.createDrive({
+        title: values.title.trim(),
+        description: values.description ? values.description.trim() : '',
       });
       message.success('Drive created');
       form.resetFields();
