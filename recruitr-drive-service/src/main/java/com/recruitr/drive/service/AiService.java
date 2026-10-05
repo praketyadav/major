@@ -165,7 +165,7 @@ public class AiService {
                 }
                 case "ADD_ROUND" -> {
                     Long driveId = payload.path("driveId").asLong(0);
-                    if (driveId == 0) yield "❌ Please specify the Drive ID "
+                    if (driveId == 0) yield " Please specify the Drive ID "
                         + "in your command (e.g. 'to drive 3').";
                     RoundRequest req = new RoundRequest();
                     req.setTitle(payload.path("title").asText());
@@ -181,7 +181,7 @@ public class AiService {
                 case "CREATE_QUESTION" -> {
                     JsonNode questions = payload.path("questions");
                     if (!questions.isArray() || questions.isEmpty())
-                        yield "❌ No questions were generated.";
+                        yield " No questions were generated.";
                     int count = 0;
                     for (JsonNode q : questions) {
                         QuestionRequest req = new QuestionRequest();
@@ -208,7 +208,7 @@ public class AiService {
                 }
                 case "QUERY_RESULTS" -> {
                     Long roundId = payload.path("roundId").asLong(0);
-                    if (roundId == 0) yield "❌ Please specify the Round ID "
+                    if (roundId == 0) yield " Please specify the Round ID "
                         + "in your command (e.g. 'round 2').";
                     var summary = driveService
                         .getRoundsForDrive(roundId)
@@ -216,13 +216,13 @@ public class AiService {
                     yield "ℹ️ Query noted for round " + roundId
                         + ". Use the Results section for full data.";
                 }
-                default -> "🤔 I couldn't understand that command. "
+                default -> " I couldn't understand that command. "
                     + "Try: 'Create a drive', 'Add a round to drive X', "
                     + "'Generate 3 MCQ questions on Java'.";
             };
 
         } catch (Exception e) {
-            return "❌ AI processing failed: " + e.getMessage();
+            return " AI processing failed: " + e.getMessage();
         }
     }
 }
