@@ -47,29 +47,27 @@ const TOKENS = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   INLINE SVG — Recruitr Emblem (from Stitch screen asset)
+   BRAND BADGE — Recruitr Logo (aligned with Dashboard header)
    ═══════════════════════════════════════════════════════════ */
-const RecruitrEmblem = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="40" height="40" fill="none">
-    <defs>
-      <linearGradient id="rec-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#0066FF" />
-        <stop offset="100%" stopColor="#0047BB" />
-      </linearGradient>
-      <filter id="rec-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="3" result="blur" />
-        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-      </filter>
-    </defs>
-    <rect width="48" height="48" rx="12" fill="#121216" stroke="#27272A" strokeWidth="1" />
-    <rect x="3" y="3" width="42" height="42" rx="9" fill="url(#rec-grad)" fillOpacity="0.12" />
-    <path
-      d="M15 14H25C28.866 14 32 17.134 32 21C32 24.3137 29.697 27.086 26.6 27.8L32.5 34H26.8L21.5 28H19V34H15V14ZM19 18V24H24.8C26.5673 24 28 22.6569 28 21C28 19.3431 26.5673 18 24.8 18H19Z"
-      fill="url(#rec-grad)"
-      filter="url(#rec-glow)"
-    />
-    <circle cx="34" cy="14" r="3" fill="#0066FF" filter="url(#rec-glow)" />
-  </svg>
+const RecruitrLogoBadge = ({ size = 48, fontSize = 26, borderRadius = 12 }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius,
+      backgroundColor: '#18181B',
+      border: '1px solid #27272A',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontWeight: 800,
+      fontSize,
+      color: '#3B82F6',
+      userSelect: 'none',
+    }}
+  >
+    R
+  </div>
 );
 
 /* ═══════════════════════════════════════════════════════════
@@ -227,22 +225,16 @@ const Login = () => {
                 marginBottom: 32,
               }}
             >
-              {/* Emblem Container */}
+              {/* Logo Badge Container */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 48,
-                  height: 48,
                   marginBottom: 16,
-                  borderRadius: 12,
-                  background: TOKENS.surfaceRecessed,
-                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
-                  overflow: 'hidden',
                 }}
               >
-                <RecruitrEmblem />
+                <RecruitrLogoBadge size={48} fontSize={26} borderRadius={12} />
               </div>
 
               {/* Wordmark */}
