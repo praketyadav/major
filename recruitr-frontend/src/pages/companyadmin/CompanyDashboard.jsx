@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Layout, Typography, Table, Modal, Form, Input, Select,
   Button, Tag, Alert, Statistic, Popconfirm, Checkbox,
@@ -6,14 +6,14 @@ import {
   ConfigProvider,
 } from 'antd';
 import {
-  CarOutlined, BankOutlined, OrderedListOutlined,
+  IdcardOutlined, BankOutlined, OrderedListOutlined,
   BarChartOutlined, TrophyOutlined, PlusOutlined,
   LogoutOutlined, DeleteOutlined, RocketOutlined,
   CheckCircleOutlined, CloseCircleOutlined,
   SettingOutlined, FileTextOutlined, TeamOutlined,
   SearchOutlined, ReloadOutlined, BellOutlined,
   AppstoreOutlined, EditOutlined, InboxOutlined,
-  DownloadOutlined,
+  DownloadOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../auth/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
@@ -68,7 +68,7 @@ const SECTIONS = {
 };
 
 const sectionMeta = {
-  [SECTIONS.DRIVES]:    { icon: <CarOutlined />,           label: 'My Drives',     desc: 'Create and manage recruitment drives' },
+  [SECTIONS.DRIVES]:    { icon: <IdcardOutlined />,        label: 'My Drives',     desc: 'Create and manage recruitment drives' },
   [SECTIONS.QUESTIONS]: { icon: <FileTextOutlined />,      label: 'Question Bank', desc: 'Curate your assessment library' },
   [SECTIONS.ROUNDS]:    { icon: <OrderedListOutlined />,   label: 'Rounds',        desc: 'Configure drive rounds & assignments' },
   [SECTIONS.RESULTS]:   { icon: <BarChartOutlined />,      label: 'Results',       desc: 'Review scores and advance candidates' },
@@ -169,7 +169,7 @@ const modalStyles = {
 // ═══════════════════════════════════════════════════════════════════
 // SECTION 1 — MY DRIVES
 // ═══════════════════════════════════════════════════════════════════
-const MyDrivesSection = ({ onManageRounds }) => {
+const MyDrivesSection = ({ onManageRounds, refreshKey }) => {
   const [drives, setDrives] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -183,7 +183,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
       const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch drives');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch drives');
     } finally {
       setLoading(false);
     }
@@ -191,7 +191,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
 
   useEffect(() => {
     fetchDrives();
-  }, [fetchDrives]);
+  }, [fetchDrives, refreshKey]);
 
   const handleCreate = async (values) => {
     setSubmitting(true);
@@ -205,7 +205,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
       setModalOpen(false);
       fetchDrives();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to create drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to create drive');
     } finally {
       setSubmitting(false);
     }
@@ -217,7 +217,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
       message.success('Drive published successfully');
       fetchDrives();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to publish drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to publish drive');
     }
   };
 
@@ -227,7 +227,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
       message.success('Drive closed successfully');
       fetchDrives();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to close drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to close drive');
     }
   };
 
@@ -237,7 +237,7 @@ const MyDrivesSection = ({ onManageRounds }) => {
       message.success('Drive deleted successfully');
       fetchDrives();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to delete drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete drive');
     }
   };
 
@@ -577,7 +577,7 @@ const QuestionBankSection = () => {
       const res = await questionService.getQuestions();
       setQuestions(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch questions');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch questions');
     } finally {
       setLoading(false);
     }
@@ -610,7 +610,7 @@ const QuestionBankSection = () => {
       setModalOpen(false);
       fetchQuestions();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to create question');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to create question');
     } finally {
       setSubmitting(false);
     }
@@ -622,7 +622,7 @@ const QuestionBankSection = () => {
       message.success('Question removed from bank');
       fetchQuestions();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to delete question');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete question');
     }
   };
 
@@ -1064,7 +1064,7 @@ const RoundsSection = ({ initialDriveId }) => {
       const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch drives');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch drives');
     }
   }, []);
 
@@ -1089,7 +1089,7 @@ const RoundsSection = ({ initialDriveId }) => {
       const res = await driveService.getRoundsForDrive(selectedDriveId);
       setRounds(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch rounds for drive');
     } finally {
       setLoading(false);
     }
@@ -1118,7 +1118,7 @@ const RoundsSection = ({ initialDriveId }) => {
       setAddModalOpen(false);
       fetchRounds();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to create round');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to create round');
     } finally {
       setSubmitting(false);
     }
@@ -1131,7 +1131,7 @@ const RoundsSection = ({ initialDriveId }) => {
       message.success('Round activated successfully');
       fetchRounds();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to activate round');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to activate round');
     }
   };
 
@@ -1162,7 +1162,7 @@ const RoundsSection = ({ initialDriveId }) => {
         setSelectedQuestionIds([]);
       }
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to load question bank');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to load question bank');
     } finally {
       setAssignLoading(false);
     }
@@ -1184,7 +1184,7 @@ const RoundsSection = ({ initialDriveId }) => {
       setSelectedQuestionIds([]);
       fetchRounds();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to assign questions to round');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to assign questions to round');
     } finally {
       setSubmitting(false);
     }
@@ -1529,7 +1529,7 @@ const RoundsSection = ({ initialDriveId }) => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <IdcardOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
             <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
               Target Drive:
             </span>
@@ -1951,7 +1951,7 @@ const ResultsSection = () => {
       const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch drives');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch drives');
     }
   }, []);
 
@@ -1977,7 +1977,7 @@ const ResultsSection = () => {
         setActiveRound(roundList[0]);
       }
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch rounds for drive');
     }
   }, [selectedDriveId, selectedRoundId]);
 
@@ -1996,7 +1996,7 @@ const ResultsSection = () => {
       const res = await resultsService.getResultsForRound(selectedRoundId);
       setResultsData(res.data || null);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch results for round');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch results for round');
       setResultsData(null);
     } finally {
       setLoading(false);
@@ -2040,7 +2040,7 @@ const ResultsSection = () => {
       }
       fetchResults();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to advance candidates');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to advance candidates');
     } finally {
       setAdvancing(false);
     }
@@ -2055,7 +2055,7 @@ const ResultsSection = () => {
       message.success('Assessment scorecard and result key released to candidates');
       fetchResults();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to release result key');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to release result key');
     } finally {
       setReleasingKey(false);
     }
@@ -2088,7 +2088,7 @@ const ResultsSection = () => {
       reviewForm.resetFields();
       fetchResults();
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to submit subjective review');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to submit subjective review');
     } finally {
       setSubmittingReview(false);
     }
@@ -2370,7 +2370,7 @@ const ResultsSection = () => {
       }}>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <IdcardOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
             <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
               Drive:
             </span>
@@ -2734,7 +2734,7 @@ const ShortlistSection = () => {
       const res = await driveService.getCompanyDrives();
       setDrives(res.data || []);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch drives');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch drives');
     }
   }, []);
 
@@ -2760,7 +2760,7 @@ const ShortlistSection = () => {
         setActiveRound(roundList[0]);
       }
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch rounds for drive');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch rounds for drive');
     }
   }, [selectedDriveId, selectedRoundId]);
 
@@ -2779,7 +2779,7 @@ const ShortlistSection = () => {
       const res = await resultsService.getResultsForRound(selectedRoundId);
       setResultsData(res.data || null);
     } catch (e) {
-      message.error(e.response?.data?.message || 'Failed to fetch shortlist');
+      message.error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to fetch shortlist');
       setResultsData(null);
     } finally {
       setLoading(false);
@@ -3091,7 +3091,7 @@ const ShortlistSection = () => {
       }}>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <CarOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
+            <IdcardOutlined style={{ color: '#3B82F6', fontSize: 18 }} />
             <span style={{ color: '#FAFAFA', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }}>
               Drive:
             </span>
@@ -3340,6 +3340,46 @@ const CompanyDashboard = () => {
   const [activeSection, setActiveSection] = useState(SECTIONS.DRIVES);
   const [selectedDriveId, setSelectedDriveId] = useState(null);
   const [siderCollapsed, setSiderCollapsed] = useState(false);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+
+  // ── AI Assistant Widget State ─────────────────────────────────────
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([
+    { role: 'ai', text: "Hi! I'm your AI assistant. Try commands like:\n• 'Create a drive called TCS 2026'\n• 'Add a 30 min aptitude round with 50% cutoff to drive 3'\n• 'Generate 3 MCQ questions on Java Collections'" }
+  ]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiTyping, setAiTyping] = useState(false);
+  const aiMessagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (aiMessagesEndRef.current) {
+      aiMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiMessages, aiTyping]);
+
+  const handleSendAiMessage = async () => {
+    const trimmed = aiInput.trim();
+    if (!trimmed || aiTyping) return;
+
+    const userMsg = trimmed;
+    setAiMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setAiInput('');
+    setAiTyping(true);
+
+    try {
+      const response = await axiosInstance.post('/api/v1/ai/command', {
+        command: userMsg,
+      });
+      const resultText = response.data?.result || 'Command processed.';
+      setAiMessages(prev => [...prev, { role: 'ai', text: resultText }]);
+      // Auto-refresh dashboard data after successful AI command
+      setDashboardRefreshKey(prev => prev + 1);
+    } catch (err) {
+      setAiMessages(prev => [...prev, { role: 'ai', text: '❌ Something went wrong. Please try again.' }]);
+    } finally {
+      setAiTyping(false);
+    }
+  };
 
   const handleManageRounds = (driveId) => {
     setSelectedDriveId(driveId);
@@ -3349,7 +3389,7 @@ const CompanyDashboard = () => {
   const renderSection = () => {
     switch (activeSection) {
       case SECTIONS.DRIVES:
-        return <MyDrivesSection onManageRounds={handleManageRounds} />;
+        return <MyDrivesSection onManageRounds={handleManageRounds} refreshKey={dashboardRefreshKey} />;
       case SECTIONS.QUESTIONS:
         return <QuestionBankSection />;
       case SECTIONS.ROUNDS:
@@ -3818,6 +3858,183 @@ const CompanyDashboard = () => {
           background: #2563EB !important;
         }
       `}</style>
+
+      {/* ── Floating AI Assistant Trigger Button ── */}
+      <Tooltip title="AI Assistant" placement="left">
+        <button
+          onClick={() => setAiOpen(!aiOpen)}
+          style={{
+            position: 'fixed',
+            bottom: '28px',
+            right: '28px',
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            background: '#2F80ED',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 1000,
+            boxShadow: '0 4px 16px rgba(47, 128, 237, 0.4)',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+          <ThunderboltOutlined style={{ fontSize: 22, color: '#FFFFFF' }} />
+        </button>
+      </Tooltip>
+
+      {/* ── Floating AI Chat Panel ── */}
+      {aiOpen && (
+        <div style={{
+          position: 'fixed',
+          bottom: '92px',
+          right: '28px',
+          width: '380px',
+          height: '480px',
+          background: '#161B22',
+          border: '1px solid #30363D',
+          borderRadius: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 999,
+          overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+        }}>
+          {/* Header */}
+          <div style={{
+            height: '56px',
+            minHeight: '56px',
+            padding: '0 16px',
+            background: '#161B22',
+            borderBottom: '1px solid #30363D',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{ color: '#FAFAFA', fontWeight: 700, fontSize: 15 }}>
+              ✨ AI Assistant
+            </span>
+            <button
+              onClick={() => setAiOpen(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#8B949E',
+                fontSize: 18,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4px',
+                borderRadius: '4px',
+                lineHeight: 1,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#FAFAFA'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#8B949E'; }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Message history area */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+          }}>
+            {aiMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                style={{
+                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  background: msg.role === 'user' ? '#2F80ED' : '#1C2128',
+                  color: msg.role === 'user' ? '#FFFFFF' : '#E6EDF3',
+                  border: msg.role === 'user' ? 'none' : '1px solid #30363D',
+                  borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                  padding: '8px 14px',
+                  maxWidth: msg.role === 'user' ? '80%' : '85%',
+                  margin: '4px 8px',
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {msg.text}
+              </div>
+            ))}
+
+            {aiTyping && (
+              <div style={{
+                alignSelf: 'flex-start',
+                background: '#1C2128',
+                color: '#8B949E',
+                border: '1px solid #30363D',
+                borderRadius: '12px 12px 12px 2px',
+                padding: '8px 14px',
+                maxWidth: '85%',
+                margin: '4px 8px',
+                fontSize: '13px',
+                fontStyle: 'italic',
+              }}>
+                ⏳ Thinking...
+              </div>
+            )}
+            <div ref={aiMessagesEndRef} />
+          </div>
+
+          {/* Input area */}
+          <div style={{
+            height: '56px',
+            minHeight: '56px',
+            padding: '8px 12px',
+            background: '#161B22',
+            borderTop: '1px solid #30363D',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <Input
+              placeholder="Type a command..."
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              onPressEnter={handleSendAiMessage}
+              disabled={aiTyping}
+              style={{
+                background: '#1C2128',
+                color: '#E6EDF3',
+                border: '1px solid #30363D',
+                borderRadius: '8px',
+                height: '38px',
+                fontSize: '13px',
+              }}
+            />
+            <Button
+              onClick={handleSendAiMessage}
+              disabled={aiTyping || !aiInput.trim()}
+              style={{
+                background: '#2F80ED',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '8px',
+                height: '38px',
+                fontWeight: 600,
+                fontSize: '13px',
+                padding: '0 16px',
+              }}
+            >
+              Send
+            </Button>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
