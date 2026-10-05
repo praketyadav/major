@@ -21,25 +21,55 @@ import axiosInstance from '../../api/axiosInstance';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// ── Theme Design Tokens (Matching Stitch Design System) ─────
+// ── Theme Design Tokens (Standardized to Company Console Design System) ─────
 const THEME = {
-  bgMain: '#0e0e12',
-  surface: '#131317',
-  surfaceLow: '#1b1b1f',
-  surfaceContainer: '#1f1f23',
-  surfaceHigh: '#2a292e',
+  bgMain: '#09090B',
+  surface: '#121216',
+  surfaceLow: '#121216',
+  surfaceContainer: '#18181B',
+  surfaceHigh: '#18181B',
   border: '#27272A',
-  borderLight: 'rgba(255, 255, 255, 0.08)',
-  primary: '#0066FF',
-  primaryHover: '#0052cc',
-  primaryGlow: 'rgba(0, 102, 255, 0.15)',
-  secondary: '#4edea3',
-  secondaryGlow: 'rgba(78, 222, 163, 0.15)',
-  danger: '#ef4444',
+  borderLight: 'rgba(255, 255, 255, 0.06)',
+  primary: '#3B82F6',
+  primaryHover: '#2563EB',
+  primaryGlow: 'rgba(59, 130, 246, 0.25)',
+  secondary: '#10B981',
+  secondaryGlow: 'rgba(16, 185, 129, 0.15)',
+  danger: '#EF4444',
   dangerGlow: 'rgba(239, 68, 68, 0.15)',
   textPrimary: '#FAFAFA',
   textSecondary: '#A1A1AA',
   textMuted: '#71717A',
+};
+
+// ── Reusable Button Tokens (Standardized to Company Console) ─────
+const btnPrimary = {
+  background: '#3B82F6',
+  borderColor: '#3B82F6',
+  color: '#FAFAFA',
+  borderRadius: '8px',
+  fontWeight: 600,
+  fontSize: '13px',
+  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  height: 38,
+  transition: 'all 0.2s ease',
+};
+
+const btnGhost = {
+  background: '#121216',
+  borderColor: '#27272A',
+  color: '#A1A1AA',
+  borderRadius: '8px',
+  fontWeight: 500,
+  fontSize: '13px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  height: 38,
+  transition: 'all 0.2s ease',
 };
 
 const SuperAdminDashboard = () => {
@@ -488,14 +518,14 @@ const SuperAdminDashboard = () => {
               width: 34,
               height: 34,
               borderRadius: 8,
-              backgroundColor: record.category === 'COLLEGE' ? 'rgba(0, 102, 255, 0.15)' : 'rgba(78, 222, 163, 0.15)',
+              backgroundColor: record.category === 'COLLEGE' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
               color: record.category === 'COLLEGE' ? THEME.primary : THEME.secondary,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
               fontSize: 14,
-              border: `1px solid ${record.category === 'COLLEGE' ? 'rgba(0,102,255,0.3)' : 'rgba(78,222,163,0.3)'}`,
+              border: `1px solid ${record.category === 'COLLEGE' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
             }}
           >
             {name ? name.charAt(0).toUpperCase() : '?'}
@@ -525,9 +555,9 @@ const SuperAdminDashboard = () => {
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.04em',
-              backgroundColor: 'rgba(0, 102, 255, 0.12)',
-              color: '#38bdf8',
-              border: '1px solid rgba(0, 102, 255, 0.25)',
+              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+              color: '#60A5FA',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 5,
@@ -633,11 +663,10 @@ const SuperAdminDashboard = () => {
           size="small"
           onClick={() => handleOpenManageModal(record)}
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            borderColor: THEME.border,
-            color: THEME.textPrimary,
+            ...btnGhost,
+            height: 30,
+            padding: '0 12px',
             fontSize: 12,
-            borderRadius: 6,
           }}
         >
           Manage
@@ -725,11 +754,10 @@ const SuperAdminDashboard = () => {
             })
           }
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            borderColor: THEME.border,
-            color: THEME.textPrimary,
+            ...btnGhost,
+            height: 30,
+            padding: '0 12px',
             fontSize: 12,
-            borderRadius: 6,
           }}
         >
           Manage
@@ -817,11 +845,10 @@ const SuperAdminDashboard = () => {
             })
           }
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            borderColor: THEME.border,
-            color: THEME.textPrimary,
+            ...btnGhost,
+            height: 30,
+            padding: '0 12px',
             fontSize: 12,
-            borderRadius: 6,
           }}
         >
           Manage
@@ -991,7 +1018,7 @@ const SuperAdminDashboard = () => {
                 borderRadius: 8,
                 fontWeight: 600,
                 height: 44,
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.4)',
+                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)',
               }}
             >
               Provision Administrator Account
@@ -1035,9 +1062,9 @@ const SuperAdminDashboard = () => {
                 padding: '2px 8px',
                 borderRadius: 4,
                 fontWeight: 700,
-                backgroundColor: 'rgba(0, 102, 255, 0.12)',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
                 color: THEME.primary,
-                border: '1px solid rgba(0, 102, 255, 0.3)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
               }}
             >
               MULTI-TENANT
@@ -1059,12 +1086,8 @@ const SuperAdminDashboard = () => {
             }}
             loading={analyticsLoading}
             style={{
-              backgroundColor: THEME.surfaceLow,
-              borderColor: THEME.border,
-              color: THEME.textPrimary,
-              borderRadius: 8,
+              ...btnGhost,
               height: 40,
-              fontWeight: 500,
             }}
           >
             Refresh Telemetry
@@ -1074,12 +1097,8 @@ const SuperAdminDashboard = () => {
             icon={<PlusOutlined />}
             onClick={() => setIsOnboardModalOpen(true)}
             style={{
-              backgroundColor: THEME.primary,
-              borderColor: THEME.primary,
-              borderRadius: 8,
+              ...btnPrimary,
               height: 40,
-              fontWeight: 600,
-              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)',
             }}
           >
             Onboard Institution / Enterprise
@@ -1110,7 +1129,7 @@ const SuperAdminDashboard = () => {
           <div
             onClick={() => setActiveSection('colleges')}
             style={{
-              background: THEME.surfaceLow,
+              background: '#121216',
               borderRadius: 12,
               border: `1px solid ${THEME.border}`,
               padding: 24,
@@ -1118,43 +1137,27 @@ const SuperAdminDashboard = () => {
               position: 'relative',
               overflow: 'hidden',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-3px)';
               e.currentTarget.style.borderColor = THEME.primary;
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 102, 255, 0.2)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.borderColor = THEME.border;
-              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.25)';
             }}
           >
-            {/* Top Accent Line */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: 'linear-gradient(90deg, #0066FF 0%, #38bdf8 100%)',
-              }}
-            />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div
                 style={{
                   width: 44,
                   height: 44,
                   borderRadius: 10,
-                  backgroundColor: 'rgba(0, 102, 255, 0.12)',
+                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
                   color: THEME.primary,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 20,
-                  border: '1px solid rgba(0, 102, 255, 0.25)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
                 }}
               >
                 <BankOutlined />
@@ -1165,9 +1168,9 @@ const SuperAdminDashboard = () => {
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: 999,
-                  backgroundColor: 'rgba(78, 222, 163, 0.12)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
                   color: THEME.secondary,
-                  border: '1px solid rgba(78, 222, 163, 0.25)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
                 }}
               >
                 +12% this mo
@@ -1219,7 +1222,7 @@ const SuperAdminDashboard = () => {
           <div
             onClick={() => setActiveSection('companies')}
             style={{
-              background: THEME.surfaceLow,
+              background: '#121216',
               borderRadius: 12,
               border: `1px solid ${THEME.border}`,
               padding: 24,
@@ -1227,43 +1230,27 @@ const SuperAdminDashboard = () => {
               position: 'relative',
               overflow: 'hidden',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-3px)';
               e.currentTarget.style.borderColor = THEME.secondary;
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(78, 222, 163, 0.2)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.borderColor = THEME.border;
-              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.25)';
             }}
           >
-            {/* Top Accent Line */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: 'linear-gradient(90deg, #4edea3 0%, #00a572 100%)',
-              }}
-            />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div
                 style={{
                   width: 44,
                   height: 44,
                   borderRadius: 10,
-                  backgroundColor: 'rgba(78, 222, 163, 0.12)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
                   color: THEME.secondary,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 20,
-                  border: '1px solid rgba(78, 222, 163, 0.25)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
                 }}
               >
                 <ShopOutlined />
@@ -1274,9 +1261,9 @@ const SuperAdminDashboard = () => {
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: 999,
-                  backgroundColor: 'rgba(78, 222, 163, 0.12)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
                   color: THEME.secondary,
-                  border: '1px solid rgba(78, 222, 163, 0.25)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
                 }}
               >
                 +8% this mo
@@ -1327,33 +1314,22 @@ const SuperAdminDashboard = () => {
         <Col xs={24} md={8}>
           <div
             style={{
-              background: THEME.surfaceLow,
+              background: '#121216',
               borderRadius: 12,
               border: `1px solid ${THEME.border}`,
               padding: 24,
               position: 'relative',
               overflow: 'hidden',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              transition: 'all 0.2s ease',
             }}
           >
-            {/* Top Accent Line */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: 'linear-gradient(90deg, #a855f7 0%, #6366f1 100%)',
-              }}
-            />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div
                 style={{
                   width: 44,
                   height: 44,
                   borderRadius: 10,
-                  backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                  backgroundColor: 'rgba(168, 85, 247, 0.15)',
                   color: '#c084fc',
                   display: 'flex',
                   alignItems: 'center',
@@ -1370,7 +1346,7 @@ const SuperAdminDashboard = () => {
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: 999,
-                  backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                  backgroundColor: 'rgba(168, 85, 247, 0.15)',
                   color: '#c084fc',
                   border: '1px solid rgba(168, 85, 247, 0.25)',
                 }}
@@ -1423,11 +1399,10 @@ const SuperAdminDashboard = () => {
       {/* Directory & Tenancy Table Section */}
       <div
         style={{
-          background: THEME.surfaceLow,
+          background: '#121216',
           borderRadius: 12,
           border: `1px solid ${THEME.border}`,
           padding: 24,
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
         }}
       >
         {/* Table Header & Controls Bar */}
@@ -1478,12 +1453,8 @@ const SuperAdminDashboard = () => {
             icon={<DownloadOutlined />}
             onClick={handleExportCSV}
             style={{
-              backgroundColor: THEME.surfaceContainer,
-              borderColor: THEME.border,
-              color: THEME.textPrimary,
-              borderRadius: 8,
+              ...btnGhost,
               height: 38,
-              fontWeight: 500,
             }}
           >
             Export Directory
@@ -1499,7 +1470,7 @@ const SuperAdminDashboard = () => {
             alignItems: 'center',
             marginBottom: 20,
             padding: 12,
-            backgroundColor: THEME.surface,
+            backgroundColor: '#09090B',
             borderRadius: 8,
             border: `1px solid ${THEME.border}`,
           }}
@@ -1853,14 +1824,14 @@ const SuperAdminDashboard = () => {
                   width: 44,
                   height: 44,
                   borderRadius: 10,
-                  backgroundColor: 'rgba(0, 102, 255, 0.15)',
+                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
                   color: THEME.primary,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 18,
                   fontWeight: 700,
-                  border: '1px solid rgba(0, 102, 255, 0.3)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
                 }}
               >
                 {fetchedUser.name ? fetchedUser.name.charAt(0).toUpperCase() : 'U'}
@@ -2000,7 +1971,7 @@ const SuperAdminDashboard = () => {
           height: 8px;
         }
         ::-webkit-scrollbar-track {
-          background: #0e0e12;
+          background: #09090B;
         }
         ::-webkit-scrollbar-thumb {
           background: #27272A;
@@ -2010,56 +1981,101 @@ const SuperAdminDashboard = () => {
           background: #424656;
         }
 
-        /* Ant Design Dark Overrides */
+        /* ── Ant Design Dark Table Overrides (Mapped to Company Console) ── */
+        .dark-table .ant-table,
         .recruitr-dark-table-container .ant-table {
           background: transparent !important;
-          color: #e4e1e7 !important;
+          color: #FAFAFA !important;
+          border: none !important;
         }
+        .dark-table .ant-table-container,
+        .recruitr-dark-table-container .ant-table-container {
+          border: none !important;
+        }
+        .dark-table .ant-table-thead > tr > th,
         .recruitr-dark-table-container .ant-table-thead > tr > th {
-          background: #1f1f23 !important;
-          color: #8c90a1 !important;
+          background: #121216 !important;
+          color: #A1A1AA !important;
           border-bottom: 1px solid #27272A !important;
+          border-right: none !important;
           font-size: 11px !important;
-          font-weight: 700 !important;
-          letter-spacing: 0.05em !important;
+          font-weight: 500 !important;
           text-transform: uppercase !important;
-          padding: 14px 16px !important;
+          letter-spacing: 0.06em !important;
+          padding: 12px 16px !important;
         }
+        .dark-table .ant-table-thead > tr > th::before,
+        .recruitr-dark-table-container .ant-table-thead > tr > th::before {
+          display: none !important;
+        }
+        .dark-table .ant-table-tbody > tr > td,
         .recruitr-dark-table-container .ant-table-tbody > tr > td {
-          background: #1b1b1f !important;
-          color: #e4e1e7 !important;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-          padding: 14px 16px !important;
-          font-size: 13px !important;
+          border-bottom: 1px solid #27272A !important;
+          border-right: none !important;
+          padding: 12px 16px !important;
+          color: #FAFAFA !important;
+          background: transparent !important;
+          transition: all 0.2s ease !important;
         }
-        .recruitr-dark-table-container .ant-table-tbody > tr:hover > td {
-          background: #232328 !important;
+        .dark-table .ant-table-tbody > tr:hover > td,
+        .dark-table .ant-table-cell-row-hover,
+        .recruitr-dark-table-container .ant-table-tbody > tr:hover > td,
+        .recruitr-dark-table-container .ant-table-cell-row-hover {
+          background: #18181B !important;
         }
+        .dark-table .ant-table-tbody > tr.ant-table-row-selected > td,
+        .recruitr-dark-table-container .ant-table-tbody > tr.ant-table-row-selected > td {
+          background: rgba(37, 99, 235, 0.10) !important;
+        }
+        .dark-table .ant-pagination,
         .recruitr-dark-table-container .ant-pagination {
-          color: #8c90a1 !important;
+          color: #A1A1AA !important;
           margin-top: 16px !important;
         }
-        .recruitr-dark-table-container .ant-pagination-item {
-          background: #1f1f23 !important;
+        .dark-table .ant-pagination .ant-pagination-item,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-item {
+          background: #121216 !important;
           border-color: #27272A !important;
         }
-        .recruitr-dark-table-container .ant-pagination-item a {
-          color: #FAFAFA !important;
+        .dark-table .ant-pagination .ant-pagination-item a,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-item a {
+          color: #A1A1AA !important;
         }
-        .recruitr-dark-table-container .ant-pagination-item-active {
-          border-color: #0066FF !important;
-          background: #0066FF !important;
+        .dark-table .ant-pagination .ant-pagination-item-active,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-item-active {
+          background: #2563EB !important;
+          border-color: #2563EB !important;
         }
-        .recruitr-dark-table-container .ant-pagination-prev .ant-pagination-item-link,
-        .recruitr-dark-table-container .ant-pagination-next .ant-pagination-item-link {
-          background: #1f1f23 !important;
+        .dark-table .ant-pagination .ant-pagination-item-active a,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-item-active a {
+          color: #fff !important;
+        }
+        .dark-table .ant-pagination .ant-pagination-prev button,
+        .dark-table .ant-pagination .ant-pagination-next button,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-prev button,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-next button,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+        .recruitr-dark-table-container .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+          background: #121216 !important;
           border-color: #27272A !important;
-          color: #FAFAFA !important;
+          color: #A1A1AA !important;
+        }
+        .dark-table .ant-empty-description,
+        .recruitr-dark-table-container .ant-empty-description {
+          color: #71717A !important;
+        }
+        .dark-table .ant-table-placeholder,
+        .recruitr-dark-table-container .ant-table-placeholder {
+          background: transparent !important;
+        }
+        .dark-table .ant-table-bordered .ant-table-container,
+        .recruitr-dark-table-container .ant-table-bordered .ant-table-container {
+          border: none !important;
         }
 
         /* Select dropdown dark overrides */
         .recruitr-dark-select .ant-select-selector {
-          background-color: #1f1f23 !important;
+          background-color: #121216 !important;
           border-color: #27272A !important;
           color: #FAFAFA !important;
           border-radius: 6px !important;
@@ -2067,24 +2083,24 @@ const SuperAdminDashboard = () => {
           align-items: center !important;
         }
         .ant-select-dropdown {
-          background-color: #1b1b1f !important;
+          background-color: #121216 !important;
           border: 1px solid #27272A !important;
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
         }
         .ant-select-item {
-          color: #e4e1e7 !important;
+          color: #A1A1AA !important;
         }
         .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
-          background-color: rgba(0, 102, 255, 0.2) !important;
-          color: #0066FF !important;
+          background-color: rgba(59, 130, 246, 0.2) !important;
+          color: #3B82F6 !important;
         }
         .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
-          background-color: #2a292e !important;
+          background-color: #18181B !important;
         }
 
         /* Input Number dark overrides */
         .ant-input-number {
-          background-color: #131317 !important;
+          background-color: #121216 !important;
           border-color: #27272A !important;
           color: #FAFAFA !important;
         }
@@ -2092,7 +2108,7 @@ const SuperAdminDashboard = () => {
           color: #FAFAFA !important;
         }
         .ant-input-number-handler-wrap {
-          background: #1f1f23 !important;
+          background: #18181B !important;
         }
       `}</style>
 
@@ -2104,7 +2120,7 @@ const SuperAdminDashboard = () => {
           left: 0,
           right: 0,
           height: 64,
-          backgroundColor: 'rgba(27, 27, 31, 0.95)',
+          backgroundColor: '#09090B',
           backdropFilter: 'blur(12px)',
           borderBottom: `1px solid ${THEME.border}`,
           display: 'flex',
@@ -2122,7 +2138,7 @@ const SuperAdminDashboard = () => {
               width: 32,
               height: 32,
               borderRadius: 8,
-              backgroundColor: '#121216',
+              backgroundColor: '#18181B',
               border: '1px solid #27272A',
               display: 'flex',
               alignItems: 'center',
@@ -2162,15 +2178,21 @@ const SuperAdminDashboard = () => {
           {/* Console Tag */}
           <span
             style={{
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: '0.08em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 12px',
+              borderRadius: 9999,
+              fontSize: 11,
+              fontWeight: 600,
               textTransform: 'uppercase',
-              backgroundColor: 'rgba(0, 102, 255, 0.1)',
-              color: THEME.primary,
-              border: '1px solid rgba(0, 102, 255, 0.25)',
-              padding: '2px 8px',
-              borderRadius: 4,
+              letterSpacing: '0.08em',
+              backgroundColor: 'rgba(30, 58, 138, 0.5)',
+              border: '1px solid #3B82F6',
+              color: '#60A5FA',
+              whiteSpace: 'nowrap',
+              lineHeight: '16px',
+              userSelect: 'none',
             }}
           >
             SUPER ADMIN CONSOLE
@@ -2266,7 +2288,7 @@ const SuperAdminDashboard = () => {
           left: 0,
           bottom: 0,
           width: 260,
-          backgroundColor: THEME.surface,
+          backgroundColor: '#09090B',
           borderRight: `1px solid ${THEME.border}`,
           display: 'flex',
           flexDirection: 'column',
@@ -2313,10 +2335,9 @@ const SuperAdminDashboard = () => {
                     fontSize: 14,
                     fontWeight: isActive ? 600 : 500,
                     transition: 'all 0.15s ease',
-                    backgroundColor: isActive ? 'rgba(0, 102, 255, 0.12)' : 'transparent',
+                    backgroundColor: isActive ? 'rgba(30, 58, 138, 0.5)' : 'transparent',
                     color: isActive ? '#ffffff' : THEME.textSecondary,
                     borderLeft: isActive ? `3px solid ${THEME.primary}` : '3px solid transparent',
-                    boxShadow: isActive ? 'inset 0 0 12px rgba(0, 102, 255, 0.15)' : 'none',
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
@@ -2349,7 +2370,7 @@ const SuperAdminDashboard = () => {
           marginLeft: 260,
           marginTop: 64,
           minHeight: 'calc(100vh - 64px)',
-          padding: '32px 40px 64px',
+          padding: 32,
           maxWidth: 1400,
         }}
       >
@@ -2580,7 +2601,7 @@ const SuperAdminDashboard = () => {
                         backgroundColor: THEME.secondary,
                         borderColor: THEME.secondary,
                         fontWeight: 600,
-                        color: '#0e0e12',
+                        color: '#09090B',
                         boxShadow: `0 4px 14px ${THEME.secondaryGlow}`,
                       }}
                     >
@@ -2613,9 +2634,9 @@ const SuperAdminDashboard = () => {
                   padding: '2px 8px',
                   borderRadius: 4,
                   fontWeight: 700,
-                  backgroundColor: selectedEntity.category === 'COLLEGE' ? 'rgba(0, 102, 255, 0.15)' : 'rgba(78, 222, 163, 0.15)',
+                  backgroundColor: selectedEntity.category === 'COLLEGE' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
                   color: selectedEntity.category === 'COLLEGE' ? THEME.primary : THEME.secondary,
-                  border: `1px solid ${selectedEntity.category === 'COLLEGE' ? 'rgba(0, 102, 255, 0.3)' : 'rgba(78, 222, 163, 0.3)'}`,
+                  border: `1px solid ${selectedEntity.category === 'COLLEGE' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
                 }}
               >
                 {selectedEntity.formattedId || (selectedEntity.category === 'COLLEGE' ? `COL-${selectedEntity.collegeId ?? selectedEntity.id}` : `CMP-${selectedEntity.companyId ?? selectedEntity.id}`)}
