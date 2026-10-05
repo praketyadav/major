@@ -17,6 +17,11 @@ spring:
           predicates:
             - Path=/api/v1/drives/**, /api/v1/questions/**
 
+        - id: drive-ai-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/ai/**
+
         - id: enrollment-service
           uri: http://localhost:8083
           predicates:
