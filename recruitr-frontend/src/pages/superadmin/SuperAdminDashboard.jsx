@@ -10,7 +10,7 @@ import {
   UserOutlined, ReloadOutlined, SearchOutlined,
   StopOutlined, PlusOutlined, DownloadOutlined,
   CopyOutlined, CheckOutlined, LogoutOutlined,
-  ArrowRightOutlined, GlobalOutlined, CheckCircleOutlined,
+  GlobalOutlined, CheckCircleOutlined,
   CloseCircleOutlined, TeamOutlined, KeyOutlined,
   SettingOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons';
@@ -1123,19 +1123,22 @@ const SuperAdminDashboard = () => {
       )}
 
       {/* 3 Metric Cards Grid */}
-      <Row gutter={[20, 20]}>
+      <Row gutter={[16, 16]}>
         {/* Metric 1: Colleges */}
         <Col xs={24} md={8}>
           <div
             onClick={() => setActiveSection('colleges')}
             style={{
-              background: '#121216',
-              borderRadius: 12,
-              border: `1px solid ${THEME.border}`,
-              padding: 24,
-              cursor: 'pointer',
               position: 'relative',
               overflow: 'hidden',
+              borderRadius: 12,
+              backgroundColor: '#121216',
+              border: `1px solid ${THEME.border}`,
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
@@ -1145,75 +1148,34 @@ const SuperAdminDashboard = () => {
               e.currentTarget.style.borderColor = THEME.border;
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                TOTAL COLLEGES
+              </span>
               <div
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
                   backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                  color: THEME.primary,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 20,
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  color: THEME.primary,
                 }}
               >
-                <BankOutlined />
+                <BankOutlined style={{ fontSize: 16 }} />
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: 999,
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  color: THEME.secondary,
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                }}
-              >
-                +12% this mo
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 32, fontWeight: 700, color: '#FAFAFA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalColleges ?? 0)}
+              </span>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#71717A' }}>
+                {(analytics?.totalColleges ?? 0) > 0 ? `${analytics.totalColleges} Campuses` : 'Campuses'}
               </span>
             </div>
-
-            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Colleges
-            </div>
-
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: THEME.textPrimary,
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                marginTop: 4,
-                marginBottom: 4,
-              }}
-            >
-              {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalColleges ?? 0)}
-            </div>
-
-            <div style={{ fontSize: 13, color: THEME.textMuted }}>
-              Institutional partner campuses
-            </div>
-
-            <div
-              style={{
-                marginTop: 16,
-                paddingTop: 14,
-                borderTop: `1px solid ${THEME.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                color: THEME.primary,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              <span>View college directory</span>
-              <ArrowRightOutlined style={{ fontSize: 12 }} />
-            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent)' }} />
           </div>
         </Col>
 
@@ -1222,13 +1184,16 @@ const SuperAdminDashboard = () => {
           <div
             onClick={() => setActiveSection('companies')}
             style={{
-              background: '#121216',
-              borderRadius: 12,
-              border: `1px solid ${THEME.border}`,
-              padding: 24,
-              cursor: 'pointer',
               position: 'relative',
               overflow: 'hidden',
+              borderRadius: 12,
+              backgroundColor: '#121216',
+              border: `1px solid ${THEME.border}`,
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
@@ -1238,75 +1203,34 @@ const SuperAdminDashboard = () => {
               e.currentTarget.style.borderColor = THEME.border;
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                TOTAL COMPANIES
+              </span>
               <div
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
                   backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  color: THEME.secondary,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 20,
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                }}
-              >
-                <ShopOutlined />
-              </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: 999,
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
                   color: THEME.secondary,
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
                 }}
               >
-                +8% this mo
+                <ShopOutlined style={{ fontSize: 16 }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 32, fontWeight: 700, color: '#FAFAFA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalCompanies ?? 0)}
+              </span>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#71717A' }}>
+                {(analytics?.totalCompanies ?? 0) > 0 ? `${analytics.totalCompanies} Partners` : 'Partners'}
               </span>
             </div>
-
-            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Companies
-            </div>
-
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: THEME.textPrimary,
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                marginTop: 4,
-                marginBottom: 4,
-              }}
-            >
-              {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalCompanies ?? 0)}
-            </div>
-
-            <div style={{ fontSize: 13, color: THEME.textMuted }}>
-              Active hiring enterprise partners
-            </div>
-
-            <div
-              style={{
-                marginTop: 16,
-                paddingTop: 14,
-                borderTop: `1px solid ${THEME.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                color: THEME.secondary,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              <span>View company partners</span>
-              <ArrowRightOutlined style={{ fontSize: 12 }} />
-            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent)' }} />
           </div>
         </Col>
 
@@ -1314,84 +1238,46 @@ const SuperAdminDashboard = () => {
         <Col xs={24} md={8}>
           <div
             style={{
-              background: '#121216',
-              borderRadius: 12,
-              border: `1px solid ${THEME.border}`,
-              padding: 24,
               position: 'relative',
               overflow: 'hidden',
+              borderRadius: 12,
+              backgroundColor: '#121216',
+              border: `1px solid ${THEME.border}`,
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
               transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                TOTAL STUDENTS
+              </span>
               <div
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 10,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
                   backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                  color: '#c084fc',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 20,
-                  border: '1px solid rgba(168, 85, 247, 0.25)',
-                }}
-              >
-                <TeamOutlined />
-              </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: 999,
-                  backgroundColor: 'rgba(168, 85, 247, 0.15)',
                   color: '#c084fc',
-                  border: '1px solid rgba(168, 85, 247, 0.25)',
                 }}
               >
-                Exam Synced
+                <TeamOutlined style={{ fontSize: 16 }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 32, fontWeight: 700, color: '#FAFAFA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalStudents ?? 0)}
+              </span>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#71717A' }}>
+                {(analytics?.totalStudents ?? 0) > 0 ? `${analytics.totalStudents} Candidates` : 'Candidates'}
               </span>
             </div>
-
-            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Students
-            </div>
-
-            <div
-              style={{
-                fontSize: 36,
-                fontWeight: 800,
-                color: THEME.textPrimary,
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                marginTop: 4,
-                marginBottom: 4,
-              }}
-            >
-              {analyticsLoading && !analytics ? <Spin size="small" /> : (analytics?.totalStudents ?? 0)}
-            </div>
-
-            <div style={{ fontSize: 13, color: THEME.textMuted }}>
-              Candidates across all campus cohorts
-            </div>
-
-            <div
-              style={{
-                marginTop: 16,
-                paddingTop: 14,
-                borderTop: `1px solid ${THEME.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                color: '#a855f7',
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              <span>Synchronized with Exam Core</span>
-              <CheckCircleOutlined style={{ fontSize: 12 }} />
-            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent)' }} />
           </div>
         </Col>
       </Row>
