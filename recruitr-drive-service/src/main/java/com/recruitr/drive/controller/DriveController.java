@@ -4,6 +4,8 @@ import com.recruitr.drive.dto.*;
 import com.recruitr.drive.service.DriveService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +17,8 @@ import java.util.Map;
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class DriveController {
+
+    private static final Logger log = LoggerFactory.getLogger(DriveController.class);
 
     private final DriveService driveService;
 
@@ -32,6 +36,7 @@ public class DriveController {
     public ResponseEntity<List<DriveResponse>> getDrives(
             @RequestHeader("X-User-Id") String userId,
             @RequestHeader("X-User-Role") String role) {
+        log.info("GET /api/v1/drives called with X-User-Id: {}, X-User-Role: {}", userId, role);
         return ResponseEntity.ok(
                 driveService.getDrivesForCompany(
                     Long.parseLong(userId), role));
